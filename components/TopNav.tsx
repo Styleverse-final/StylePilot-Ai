@@ -135,6 +135,80 @@ function usePrefetchOnce() {
   };
 }
 
+/** requestIdleCallback, with a timeout fallback for Safari. */
+function whenIdle(fn: () => void, timeout = 2000): () => void {
+  type IdleWindow = Window & {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
+  const w = window as IdleWindow;
+  if (typeof w.requestIdleCallback === "function") {
+    const id = w.requestIdleCallback(fn, { timeout });
+    return () => w.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(fn, 200);
+  return () => window.clearTimeout(id);
+}
+
+/**
+ * WARM THE PRIMARY TABS ONCE THE FIRST SCREEN HAS PAINTED.
+ *
+ * Hovering pulls a route's full payload, but only if the reader hovers, and a
+ * reader who goes straight from reading to clicking never does. This warms
+ * the tabs they are most likely to click next, without ever competing with
+ * the screen they are looking at now.
+ *
+ * FOUR THINGS KEEP IT OFF THE CRITICAL PATH, and all four matter:
+ *
+ *   1. PRIMARY ONLY. Five routes, not thirteen. The daily decision loop.
+ *      Secondary and More are left to hover -- warming everything would cost
+ *      thirteen full server renders to save a click that may not come.
+ *   2. AFTER IDLE. requestIdleCallback, so nothing starts until the browser
+ *      has finished with the current screen. Safari has no rIC, so it falls
+ *      back to a short timeout rather than being skipped.
+ *   3. ONE AT A TIME. Sequential with a gap, not a burst of five. This runs
+ *      on one hobby-plan lambda: five concurrent renders would queue behind
+ *      each other anyway and could delay a real navigation the reader makes
+ *      while they are running.
+ *   4. CURRENT ROUTE SKIPPED. It is already here.
+ *
+ * The `prefetched` Set is module state, so it survives client-side
+ * navigation: the warm-up runs once per full page load, not once per screen.
+ */
+const WARM_GAP_MS = 450;
+
+function useWarmPrimary(primary: readonly NavItem[], pathname: string) {
+  const router = useRouter();
+  useEffect(() => {
+    const pending = primary
+      .map((item) => item.href)
+      .filter((href) => href !== pathname && !prefetched.has(href));
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    const timers: number[] = [];
+
+    const cancelIdle = whenIdle(() => {
+      if (cancelled) return;
+      pending.forEach((href, i) => {
+        timers.push(
+          window.setTimeout(() => {
+            if (cancelled || prefetched.has(href)) return;
+            prefetched.add(href);
+            router.prefetch(href);
+          }, i * WARM_GAP_MS),
+        );
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdle();
+      timers.forEach((t) => window.clearTimeout(t));
+    };
+  }, [primary, pathname, router]);
+}
+
 export function TopNav({ exceptionCount, user }: TopNavProps) {
   const prefetchOnce = usePrefetchOnce();
   const { primary, secondary, more } = navFor(user?.role);
@@ -143,12 +217,22 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
   const pathname = usePathname();
   const { open } = useCopilot();
 
-  if (CHROMELESS_ROUTES.includes(pathname)) return null;
-
-  const moreActive = more.some((item) => isActive(pathname, item.href));
+  // Called BEFORE the early return below. There is already one useEffect
+  // after that return, which is a hooks-order violation that only survives
+  // because /login renders outside this layout so the branch is never taken.
+  // Adding a second one behind it would make a live bug out of a latent one.
+  useWarmPrimary(primary, pathname);
 
   // Close on an outside click. Without this the menu stays open behind the
   // next thing the reader does, which reads as a stuck UI rather than a menu.
+  //
+  // ABOVE the chromeless early return, not below it. It used to sit after,
+  // which meant a render that returned null ran one hook fewer than a render
+  // that did not -- React counts hooks by call order, so the next render
+  // would read the wrong slot. It only ever survived because /login is
+  // outside this layout, so the branch is never taken in practice. That is
+  // luck, not a design, and adding a second hook behind it would have turned
+  // a latent bug into a live one.
   useEffect(() => {
     if (!moreOpen) return;
     const onDown = (event: MouseEvent) => {
@@ -159,6 +243,10 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [moreOpen]);
+
+  if (CHROMELESS_ROUTES.includes(pathname)) return null;
+
+  const moreActive = more.some((item) => isActive(pathname, item.href));
 
   const renderTab = (item: NavItem, secondary: boolean) => {
     const active = isActive(pathname, item.href);
