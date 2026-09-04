@@ -82,6 +82,35 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
  * cookies. Nothing is stored in localStorage and no token is handed to the
  * browser bundle.
  */
+/**
+ * THE SIX ACCOUNTS THIS DEPLOYMENT ADMITS.
+ *
+ * All 450 planner accounts exist in the database and every one of them has a
+ * real, RLS-scoped view of the data. This deployment is a demonstration, and
+ * a demonstration wants a known set of doors: these six span all six roles and
+ * both brands, so anything worth showing can be shown through one of them.
+ *
+ * WHAT THIS IS, AND WHAT IT IS NOT. It gates the APPLICATION. It does not
+ * disable the other 444 accounts in Supabase, so their credentials would still
+ * work against the Supabase API directly. That is the honest description of a
+ * front-door lock, and it is the right level for a demo: reversible by editing
+ * one array, and it takes nothing away from the accounts themselves. If the
+ * database itself needs locking down, the accounts have to be banned in
+ * Supabase auth, which is a different and heavier operation.
+ *
+ * Row level security is unaffected either way -- it is what decides what each
+ * of these six can SEE once they are in, and it would still scope any of the
+ * other 444 correctly if they were let back in.
+ */
+const ADMITTED_EMPLOYEE_IDS: readonly string[] = [
+  'EMP-SPD-0001', // Ava Menon         planner           SpeedStyle
+  'EMP-SPD-0019', // Shreya Bose       category manager  SpeedStyle
+  'EMP-SPD-0060', // Shreya Reddy      planning manager  SpeedStyle
+  'EMP-SPD-0067', // Marco Patel       CMPO              SpeedStyle
+  'EMP-ECO-0103', // Manav Bose        CMPO              EcoWeave
+  'EMP-SPD-0295', // Aarav Chatterjee  group CMPO        both brands
+]
+
 async function signIn(_previous: LoginState, formData: FormData): Promise<LoginState> {
   'use server'
 
@@ -101,6 +130,18 @@ async function signIn(_previous: LoginState, formData: FormData): Promise<LoginS
     return {
       error:
         'That does not look like an employee ID. It reads like EMP-SPD-0001 -- three letters for the brand, then four digits.',
+    }
+  }
+
+  // Checked BEFORE any credential reaches Supabase, so an id that is not
+  // admitted cannot use this form to test passwords either. The message says
+  // the account is not open on this deployment rather than that it does not
+  // exist, because it does exist -- claiming otherwise would be a lie the
+  // rest of this system does not tell.
+  if (!ADMITTED_EMPLOYEE_IDS.includes(employeeId.toUpperCase())) {
+    return {
+      error:
+        'That account is not open on this deployment. Six accounts are, one per role: EMP-SPD-0001 (planner), EMP-SPD-0019 (category manager), EMP-SPD-0060 (planning manager), EMP-SPD-0067 (CMPO, SpeedStyle), EMP-ECO-0103 (CMPO, EcoWeave), EMP-SPD-0295 (group CMPO).',
     }
   }
 
