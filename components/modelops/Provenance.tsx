@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Pill } from "@/components";
+import { Card, CardBody, CardHeader, Pill, Why } from "@/components";
 
 import { UNTABLED } from "./constants";
 import { plural } from "./format";
@@ -33,15 +33,17 @@ export function Provenance() {
         }
       />
       <CardBody>
-        <p className="max-w-[92ch] text-copy leading-[1.6] text-body">
-          Every accuracy, benchmark, coverage figure, threshold, escalation
-          count and timestamp on this screen is selected from Postgres when the
-          page renders, through the anon client carrying your session cookie
+        <Why
+          lead="Every accuracy, benchmark, coverage figure, threshold, escalation count and timestamp on this screen is selected from Postgres when the page renders"
+          label="under whose permissions"
+          className="block max-w-[92ch]"
+        >
+          It is read through the anon client carrying your session cookie
           &mdash; so row level security decides what you see, and a figure you
           cannot read simply is not here. The model is scored offline in batch;
           nothing on this page calls a model, and there is no prediction
           endpoint behind it.
-        </p>
+        </Why>
         <p className="mt-[9px] max-w-[92ch] text-copy leading-[1.6] text-body">
           <b className="text-ink">
             {count} {plural(count, "figure is", "figures are")} authored rather

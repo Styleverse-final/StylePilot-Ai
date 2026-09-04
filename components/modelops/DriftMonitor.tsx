@@ -1,4 +1,4 @@
-import { Banner, Card, CardBody, CardHeader, DataTable, Pill, type Column } from "@/components";
+import { Banner, Card, CardBody, CardHeader, DataTable, Pill, Why, type Column } from "@/components";
 
 import { DRIFT_RULE } from "./constants";
 import type { AgentRun, DriftBrand } from "./data";
@@ -223,19 +223,18 @@ export function DriftMonitor({
       />
 
       <CardBody>
-        <p className="mb-[14px] max-w-[92ch] text-copy leading-[1.6] text-body">
-          The forecast agent refreshes every series on a pass and scores each
-          one against its own recent history on the same pass. It scores
-          against the series&rsquo; own baseline and not a global target
-          because accuracy is not comparable across series: a thin accessories
-          line and a high-volume tops line sit at quite different accuracies
-          and both are normal, and what is abnormal is either of them falling
-          below where it has been sitting. A refresh is routine and stays
-          inside the band. Drift is not routine, and the agent never retrains
-          itself out of it &mdash; it escalates to the named human who owns the
-          band. The band&rsquo;s own wording, with the illustration it uses, is
-          quoted from the row below.
-        </p>
+        <Why
+          lead="The forecast agent refreshes every series on a pass, scores each against its own recent history, and escalates drift to the named human who owns the band rather than retraining itself out of it"
+          label="why it scores against each series rather than a target"
+          className="mb-[14px] block max-w-[92ch]"
+        >
+          Accuracy is not comparable across series: a thin accessories line and
+          a high-volume tops line sit at quite different accuracies and both
+          are normal, and what is abnormal is either of them falling below
+          where it has been sitting. A refresh is routine and stays inside the
+          band. Drift is not. The band&rsquo;s own wording, with the
+          illustration it uses, is quoted from the row below.
+        </Why>
 
         <div className="flex flex-col gap-[14px]">
           {brands.length === 0 ? (

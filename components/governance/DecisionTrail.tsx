@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { Card, CardBody, CardHeader, Pill, SeriesName } from "@/components";
+import { Card, CardBody, CardHeader, Pill, SeriesName, Why } from "@/components";
 import type { PillVariant } from "@/components";
 
 import { TRAIL_PAGE_SIZE } from "./constants";
@@ -46,11 +46,16 @@ import {
  * -----------------------------------------
  * A human row carries recommended_value and accepted_value on the decision
  * itself. Every agent row in this ledger has NULL in both. That is a real
- * property of the fixture and it is printed rather than papered over: the
- * agent rows show the figures from the RECOMMENDATION they acted on, and
- * the row says that is where they came from. A zero in those columns would
- * have read as "the agent committed nothing", which is a different and
- * false statement.
+ * property of the fixture and it is stated rather than papered over: the
+ * agent rows show the figures from the RECOMMENDATION they acted on. A zero
+ * in those columns would have read as "the agent committed nothing", which
+ * is a different and false statement.
+ *
+ * That caveat is stated ONCE, on the card header, not on each row. It is a
+ * property of every agent entry in the table, so repeating it per row said
+ * the same thing eighteen times and buried the eighteen things that actually
+ * differed. Facts that vary by row stay on the row; facts about the ledger
+ * live on the ledger.
  *
  * ACCOUNTABILITY IS THE POINT OF THE ROW
  * --------------------------------------
@@ -227,13 +232,6 @@ function Comparison({ entry }: { entry: LedgerEntry }) {
           {values.shiftPp !== null ? ` (${formatPp(values.shiftPp)} share)` : ""}
         </dd>
       </dl>
-      <Muted>
-        The decision row&apos;s own value columns are empty on this and on every
-        other agent entry: the agent wrote no number into the ledger. The
-        figures above are read from the recommendation it acted on, so they
-        are labelled as what was on the table rather than as what the row
-        recorded.
-      </Muted>
     </>
   );
 }
@@ -252,12 +250,16 @@ function AccountableLine({
         <span className="font-bold text-ink">{entry.actorId ?? "An agent"}</span>{" "}
         executed this.{" "}
         <span className="font-bold text-ink">{personLine(accountable)}</span> is
-        answerable for it -- accountability does not transfer to software, and
-        accountable_planner is NOT NULL on an agent row for exactly that
-        reason.{" "}
+        answerable for it.{" "}
+        {/* Which of the two resolution paths produced that name is a fact
+            about THIS row, so it stays on the row. Why the paths exist is a
+            fact about the ledger, and it is stated once on the card header --
+            it used to be repeated here, on all 22 of them. */}
         {accountable.via === "autonomy_band"
-          ? "The row stores that person as a name; the employee record behind it is resolved through the autonomy band this agent runs under, because two planners in this pilot share a name and a name is not a key."
-          : "The row stores that person as a name and no employee record for it is readable in your scope, so the name captured at write time is shown as it was written."}{" "}
+          ? "Name resolved through the autonomy band. "
+          : accountable.via === "unresolved"
+            ? "Name shown as written; no employee record readable in your scope. "
+            : ""}
         <span className="font-mono text-[11px] text-ink">{entry.modelVersion}</span>
       </Muted>
     );
@@ -394,7 +396,7 @@ export function DecisionTrail({
         actions={headerAction}
       />
       <CardBody>
-        <Muted className="mb-[14px]">
+        <Muted className="mb-[14px] block">
           {total === 0
             ? "No decisions are readable in your scope."
             : `${formatCount(total)} entries readable in your scope: ${formatCount(humans)} written by people and ${formatCount(agents)} written by agents.`}{" "}
@@ -415,11 +417,6 @@ export function DecisionTrail({
           ) : (
             "Every entry readable to you is on this page."
           )}{" "}
-          What you can see is decided by row level security rather than by this
-          screen: a decision is visible exactly when the recommendation it
-          decided is visible, so a planner reads their own categories and
-          region and a manager reads the brand. These are the counts in YOUR
-          scope, not the counts in the pilot.
           {firstHumanPage !== null && !humansOnThisPage ? (
             <>
               {" "}
@@ -437,6 +434,36 @@ export function DecisionTrail({
             </>
           ) : null}
         </Muted>
+
+        {/* Everything here used to be printed on every row. It is one fact
+            about how the ledger is built and one about what you can see, so
+            it is stated once, and the rows carry only what differs between
+            them. */}
+        <Why
+          lead="These are the counts in your scope, not the counts in the pilot"
+          label="how the ledger is built"
+          className="mb-[14px] block"
+        >
+          A decision is visible exactly when the recommendation it decided is
+          visible, so a planner reads their own categories and region and a
+          manager reads the brand. That is row level security deciding it, not
+          this screen.{" "}
+          {agents > 0 ? (
+            <>
+              On agent entries the decision row&apos;s own value columns are
+              empty -- the agent wrote no number into the ledger -- so the
+              figures shown are read from the recommendation it acted on, and
+              labelled as what was on the table rather than as what the row
+              recorded. Accountability does not transfer to software:
+              accountable_planner is NOT NULL on an agent row for exactly that
+              reason. The row stores that person as a name, resolved through
+              the autonomy band the agent runs under, because two planners in
+              this pilot share a name and a name is not a key. Where no
+              employee record is readable in your scope, the name captured at
+              write time is shown as it was written.
+            </>
+          ) : null}
+        </Why>
 
         {shown.length === 0 ? (
           <Quote>

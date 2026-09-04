@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Pill } from "@/components";
+import { Card, CardBody, CardHeader, Pill, Why } from "@/components";
 import type { AgentRun } from "@/lib/queries";
 
 import { Muted, Quote } from "./Layout";
@@ -326,17 +326,19 @@ export function LearningLoop({ analysis, learningRuns }: LearningLoopProps) {
           <div className="mb-[4px] text-[12.5px] font-extrabold text-ink">
             The rule, in full
           </div>
-          <Muted className="mb-[8px]">
-            Whole-phrase, case-insensitive, on word boundaries, tested in this
-            order; the first match wins. Model gap is tested first and beats
-            everything, because a reason that says the model missed something is
-            a model gap even when it also names a competitor -- the claim about
-            the SYSTEM is the one that decides whether the row belongs in a
-            retraining queue. Order matters within the judgement rules too:
-            &ldquo;market price has moved&rdquo; is competitor activity, and a
-            calendar rule matching a loose word like &ldquo;moved&rdquo; would
-            have taken it.
-          </Muted>
+          <Why
+            lead="Whole-phrase, case-insensitive, on word boundaries, tested in this order; the first match wins"
+            label="why this order"
+            className="mb-[8px] block"
+          >
+            Model gap is tested first and beats everything, because a reason
+            that says the model missed something is a model gap even when it
+            also names a competitor -- the claim about the SYSTEM is the one
+            that decides whether the row belongs in a retraining queue. Order
+            matters within the judgement rules too: &ldquo;market price has
+            moved&rdquo; is competitor activity, and a calendar rule matching a
+            loose word like &ldquo;moved&rdquo; would have taken it.
+          </Why>
 
           <RuleCard
             rule={MODEL_GAP_RULE}

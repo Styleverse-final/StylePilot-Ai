@@ -4,6 +4,7 @@ import {
   CardHeader,
   DataTable,
   Pill,
+  Why,
   type Column,
 } from "@/components";
 
@@ -226,15 +227,18 @@ export function SupportList({
           </p>
         ) : null}
 
-        <p className="max-w-[88ch] text-copy leading-[1.6] text-body">
-          Nobody on this list is late, because nothing here has a date. The
-          comparison is against the median for their own segment, so somebody
-          on the longest curriculum in the programme is measured against other
-          people carrying that curriculum rather than against a Champion on
-          the shortest one. Ordering by hours
-          remaining puts the people who were asked for most at the top, which
-          is where an hour of a Champion&apos;s time goes furthest.
-        </p>
+        <Why
+          lead="Nobody on this list is late, because nothing here has a date"
+          label="what it is ranked by"
+          className="block max-w-[88ch]"
+        >
+          The comparison is against the median for their own segment, so
+          somebody on the longest curriculum in the programme is measured
+          against other people carrying that curriculum rather than against a
+          Champion on the shortest one. Ordering by hours remaining puts the
+          people who were asked for most at the top, which is where an hour of
+          a Champion&apos;s time goes furthest.
+        </Why>
 
         {medians.length > 0 ? (
           <div className="mt-[12px] flex flex-wrap gap-x-[18px] gap-y-[6px] text-small font-semibold text-mute">

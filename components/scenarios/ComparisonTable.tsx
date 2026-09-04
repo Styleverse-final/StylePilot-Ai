@@ -1,5 +1,6 @@
 import { DataTable, type Column } from "@/components/DataTable";
 import { Pill } from "@/components/Pill";
+import { Why } from "@/components/Why";
 
 import {
   DASH,
@@ -343,14 +344,16 @@ export function ComparisonTable({
         ) : null}
 
         {rows.some((row) => row.result.priceFractionClamped) ? (
-          <p className="mt-[8px] max-w-[96ch] text-[11.5px] font-semibold leading-[1.6] text-amber">
-            A marked row asked for a realised price below the floor the fitted
-            curve stops at, so it was costed at that floor instead. The units,
-            the revenue and the markdown on that row all use the same clamped
-            price -- they cannot disagree with each other -- but the price they
-            use is not the one the levers name, and the row says so rather than
-            reading a curve that was never fitted there.
-          </p>
+          <Why
+            lead="A marked row asked for a realised price below the floor the fitted curve stops at, so it was costed at that floor instead"
+            label="what that does to the row"
+            className="mt-[8px] block max-w-[96ch]"
+          >
+            The units, the revenue and the markdown on that row all use the
+            same clamped price -- they cannot disagree with each other -- but
+            the price they use is not the one the levers name, and the row says
+            so rather than reading a curve that was never fitted there.
+          </Why>
         ) : null}
 
         {anyCapped ? (

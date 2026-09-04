@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, DataTable, Pill } from "@/components";
+import { Card, CardBody, CardHeader, DataTable, Pill, Why } from "@/components";
 import type { Column } from "@/components";
 
 import type { ThresholdUse } from "./data";
@@ -139,18 +139,22 @@ export function SourceLedger({ sources }: { sources: readonly SourceRow[] }) {
         subtitle="source_table names the batch job's inputs, in the pipeline's names, not this application's"
       />
       <CardBody>
-        <p className="max-w-[96ch] text-copy leading-[1.6] text-body">
-          Every figure in the four handoff cards on this screen was read from
-          downstream_handoff at request time, and every row carries the source
-          it was computed from.
+        {/* The claim is one sentence; the audit of the claim is 250 words.
+            A reader who wants to check needs all of it, and a reader who
+            wants the table needs none of it, so the first sentence stays and
+            the rest opens on request. */}
+        <Why
+          lead="Every figure in the four handoff cards on this screen was read from downstream_handoff at request time, and every row carries the source it was computed from"
+          label="what is authored rather than read"
+          className="block max-w-[96ch]"
+        >
           That column is only worth printing if it tells you whether you could
           go and check -- so this ledger says so. Two of these sources have no
           counterpart in the schema this application reads: the attribute rows
           and the store rows cannot be recomputed on this screen, and are shown
           as what the pipeline recorded rather than as something re-derived
           here.
-        </p>
-        <p className="mt-[9px] max-w-[96ch] text-copy leading-[1.6] text-body">
+          <span className="mt-[9px] block">
           Nothing on this screen is a typed-in figure: every number you can read
           was returned by a query or computed here from numbers that were. What
           is authored rather than read is exactly this, and nothing else. One,
@@ -167,7 +171,8 @@ export function SourceLedger({ sources }: { sources: readonly SourceRow[] }) {
           test in the completeness panel, that a signal must lead demand by at
           least a week, which is the handoff&apos;s own reason for dismissing a
           zero-week lead rather than a rule this screen invented.
-        </p>
+          </span>
+        </Why>
         <div className="mt-[14px]">
           <DataTable
             columns={columns}

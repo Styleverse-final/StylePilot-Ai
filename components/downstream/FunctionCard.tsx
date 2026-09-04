@@ -32,7 +32,22 @@ import type { ReviewMark } from "./review";
  * was laundered. So it is rendered, and it argues with itself in public.
  */
 
-function MarkBlock({ mark }: { mark: ReviewMark }) {
+/**
+ * A mark, with its reasoning shown only the first time that reasoning appears
+ * on this card.
+ *
+ * WHY THE SECOND ONE IS SHORTER. Several of these checks are STRUCTURAL: the
+ * ratio-of-shares objection is true of the quantity, so it fires on every row
+ * that carries one. Printing the same 60-word paragraph under six consecutive
+ * rows does not make the objection six times stronger -- it pushes the six
+ * insights apart and trains the reader to skip the amber block, which is the
+ * one thing this panel cannot afford.
+ *
+ * The FLAG still appears on every row, because which rows are affected is a
+ * fact about those rows and a reader acts on it. Only the reasoning, which is
+ * identical, is said once.
+ */
+function MarkBlock({ mark, explain }: { mark: ReviewMark; explain: boolean }) {
   const flagged = mark.level === "flag";
   return (
     <div
@@ -47,15 +62,31 @@ function MarkBlock({ mark }: { mark: ReviewMark }) {
             &ldquo;{mark.quote}&rdquo;
           </span>
         ) : null}
+        {explain ? null : (
+          <span className="text-[10.5px] font-semibold text-mute">
+            same objection as above
+          </span>
+        )}
       </div>
-      <p className="mt-[5px] max-w-[86ch] text-[11.5px] leading-[1.55] text-body">
-        {mark.detail}
-      </p>
+      {explain ? (
+        <p className="mt-[5px] max-w-[86ch] text-[11.5px] leading-[1.55] text-body">
+          {mark.detail}
+        </p>
+      ) : null}
     </div>
   );
 }
 
-function InsightRow({ row }: { row: HandoffRow }) {
+const EMPTY_CODES: ReadonlySet<string> = new Set();
+
+function InsightRow({
+  row,
+  explainedCodes,
+}: {
+  row: HandoffRow;
+  /** Codes whose reasoning has already been printed higher up this card. */
+  explainedCodes: ReadonlySet<string>;
+}) {
   const flagged = row.review.some((mark) => mark.level === "flag");
   return (
     <div className="flex gap-[9px] border-b border-rule py-[10px] last:border-b-0">
@@ -71,7 +102,11 @@ function InsightRow({ row }: { row: HandoffRow }) {
         </p>
 
         {row.review.map((mark) => (
-          <MarkBlock key={`${row.id}-${mark.code}-${mark.label}`} mark={mark} />
+          <MarkBlock
+            key={`${row.id}-${mark.code}-${mark.label}`}
+            mark={mark}
+            explain={!explainedCodes.has(mark.code)}
+          />
         ))}
 
         <div className="mt-[7px] flex flex-wrap items-center gap-x-[7px] gap-y-[3px] text-[10px] font-bold text-mute">
@@ -110,6 +145,19 @@ export function FunctionCard({ group, brandLabel, showBrands }: FunctionCardProp
     row.review.some((mark) => mark.level === "flag"),
   ).length;
 
+  // Which objections a reader has already been given the reasoning for by the
+  // time each row is reached. Walked in the same order the rows render in, so
+  // the explanation always lands on the FIRST row that carries it rather than
+  // on an arbitrary one.
+  const seen = new Set<string>();
+  const explainedBefore = new Map<HandoffRow["id"], ReadonlySet<string>>();
+  for (const brand of group.brands) {
+    for (const row of brand.rows) {
+      explainedBefore.set(row.id, new Set(seen));
+      for (const mark of row.review) seen.add(mark.code);
+    }
+  }
+
   return (
     <Card>
       <CardHeader
@@ -144,7 +192,11 @@ export function FunctionCard({ group, brandLabel, showBrands }: FunctionCardProp
               </div>
             ) : null}
             {brand.rows.map((row) => (
-              <InsightRow key={row.id} row={row} />
+              <InsightRow
+                key={row.id}
+                row={row}
+                explainedCodes={explainedBefore.get(row.id) ?? EMPTY_CODES}
+              />
             ))}
           </div>
         ))}

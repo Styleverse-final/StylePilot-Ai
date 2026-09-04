@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, DataTable, Pill } from "@/components";
+import { Card, CardBody, CardHeader, DataTable, Pill, Why } from "@/components";
 import type { Column } from "@/components";
 import type { TouchlessRate } from "@/lib/queries";
 
@@ -354,15 +354,18 @@ export function TimeReallocation({
               not credited with hours it never reported.
             </p>
 
-            <p className="mt-[10px] max-w-[92ch] text-small leading-[1.6] text-body">
-              What this panel deliberately does NOT do is decide where the
-              freed hours go. The formula only shrinks; it has nothing to say
-              about what fills the gap, and a chart showing commercial strategy
-              rising to meet it would be an assertion about management
-              behaviour dressed as arithmetic. Where the case commits that
-              capacity is the redeployment ledger further down, and that is
-              labelled as the case&apos;s commitment rather than as a projection.
-            </p>
+            <Why
+              lead="This panel does not decide where the freed hours go"
+              label="why not"
+              className="mt-[10px] block max-w-[92ch]"
+            >
+              The formula only shrinks; it has nothing to say about what fills
+              the gap, and a chart showing commercial strategy rising to meet
+              it would be an assertion about management behaviour dressed as
+              arithmetic. Where the case commits that capacity is the
+              redeployment ledger further down, and that is labelled as the
+              case&apos;s commitment rather than as a projection.
+            </Why>
           </>
         )}
       </CardBody>

@@ -164,7 +164,12 @@ export async function getGateRules(
 ): Promise<Record<string, GateRule>> {
   const { data, error } = await sb
     .from("downstream_handoff")
-    .select("brand_id, iso_week, insight, supporting_metric, source_table, generated_at")
+    // Not `insight`: this function reads the THRESHOLD out of
+    // supporting_metric and never the sentence beside it. insight is the
+    // widest column in downstream_handoff -- a full paragraph per row -- so
+    // selecting it pulled the text of every MARKETING row across the wire on
+    // every render of this screen to be dropped on arrival.
+    .select("brand_id, iso_week, supporting_metric, source_table, generated_at")
     .eq("function", "MARKETING")
     .order("generated_at", { ascending: false });
 

@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader } from "@/components";
+import { Card, CardBody, CardHeader, Why } from "@/components";
 // From navItems, NOT from TopNav: TopNav is a client module, and a server
 // component importing a constant from one gets undefined at runtime.
 import { PRIMARY_NAV, SECONDARY_NAV } from "@/components/navItems";
@@ -141,15 +141,20 @@ export function Architecture({ registry, parameters, bands }: ArchitectureProps)
         subtitle="Five layers. Models produce, policy decides, agents act, language explains."
       />
       <CardBody>
-        <p className="mb-[13px] max-w-[92ch] text-copy leading-[1.6] text-body">
+        {/* The answer goes first. The question that motivated it, and the
+            standard of evidence behind it, are worth having and are not
+            worth three lines above the diagram they describe. */}
+        <Why
+          lead="Four of these five layers would still be doing work if the forecast were replaced tomorrow"
+          label="what that claims"
+          className="mb-[13px] block max-w-[92ch]"
+        >
           The question this screen exists to answer is whether StyleVerse is a
           model with a dashboard bolted on, or a planning system that happens
-          to contain models. It is the second, and the difference is that four
-          of these five layers would still be doing work if the forecast were
-          replaced tomorrow. Every layer below names things you can go and
-          look at in this repository, and the counts beside them are read from
-          those rows at request time.
-        </p>
+          to contain models. It is the second. Every layer below names things
+          you can go and look at in this repository, and the counts beside them
+          are read from those rows at request time.
+        </Why>
 
         <div className="flex flex-col gap-[8px]">
           <Layer index={5} name="Interface" tint="interface" names={routes}>
