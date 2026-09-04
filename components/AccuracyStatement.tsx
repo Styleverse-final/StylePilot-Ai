@@ -27,6 +27,19 @@ import { Why } from "./Why";
 export type AccuracyStatementProps = {
   accuracy: AccuracyHeadline;
   variant?: "inline" | "bars" | "compact";
+  /**
+   * bars only. Move the per-bar reasoning and the MASE line behind a single
+   * <Why>, leaving the three percentages and their bars visible.
+   *
+   * OPT-IN, and deliberately so. variant="bars" also renders on /signals, the
+   * dashboard accuracy card and the model-ops registry panel, where the notes
+   * under each bar are the point of the panel. Only the Workbench right rail
+   * asks for them collapsed, so only the Workbench passes this.
+   *
+   * Part H is unaffected either way: the headline percentage and the margin
+   * over seasonal naive are on the BARS, which stay visible.
+   */
+  notesBehindWhy?: boolean;
   className?: string;
 };
 
@@ -63,6 +76,7 @@ function Bar({
 export function AccuracyStatement({
   accuracy: a,
   variant = "inline",
+  notesBehindWhy = false,
   className,
 }: AccuracyStatementProps) {
   if (variant === "compact") {
@@ -117,6 +131,10 @@ export function AccuracyStatement({
     );
   }
 
+  const SEASONAL_NOTE = `The benchmark nobody constructed. Margin +${a.vsSeasonalNaivePoints.toFixed(1)} points -- this is the comparison that proves the model works.`;
+  const MANUAL_NOTE = `Authored by the dataset designer and calibrated to a target, so the +${a.vsManualPoints.toFixed(1)} point margin proves less than its size suggests.`;
+  const MASE_LINE = `MASE ${a.mase.toFixed(3)} against seasonal naive at ${a.maseSeasonalNaive.toFixed(3)}; below 1.00 beats the benchmark on its own scale. Drift ${a.driftPct.toFixed(1)}% and 13-week rolling mean ${a.rolling13Pct.toFixed(1)}% are the other two benchmarks scored on the identical row mask.`;
+
   return (
     <div className={className}>
       <Bar label="StyleVerse model" pct={a.headlinePct} tone="model" />
@@ -124,21 +142,29 @@ export function AccuracyStatement({
         label="Seasonal naive"
         pct={a.seasonalNaivePct}
         tone="bench"
-        note={`The benchmark nobody constructed. Margin +${a.vsSeasonalNaivePoints.toFixed(1)} points -- this is the comparison that proves the model works.`}
+        note={notesBehindWhy ? undefined : SEASONAL_NOTE}
       />
       <Bar
         label="Manual baseline"
         pct={a.manualPct}
         tone="manual"
-        note={`Authored by the dataset designer and calibrated to a target, so the +${a.vsManualPoints.toFixed(1)} point margin proves less than its size suggests.`}
+        note={notesBehindWhy ? undefined : MANUAL_NOTE}
       />
-      <div className="pt-[11px] text-small font-semibold text-mute leading-[1.6]">
-        MASE {a.mase.toFixed(3)} against seasonal naive at{" "}
-        {a.maseSeasonalNaive.toFixed(3)}; below 1.00 beats the benchmark on its
-        own scale. Drift {a.driftPct.toFixed(1)}% and 13-week rolling mean{" "}
-        {a.rolling13Pct.toFixed(1)}% are the other two benchmarks scored on the
-        identical row mask.
-      </div>
+      {notesBehindWhy ? (
+        <Why
+          lead="Seasonal naive is the benchmark that counts"
+          label="why, and the other three scores"
+          className="mt-[9px] block"
+        >
+          <span className="block">{SEASONAL_NOTE}</span>
+          <span className="mt-[6px] block">{MANUAL_NOTE}</span>
+          <span className="mt-[6px] block">{MASE_LINE}</span>
+        </Why>
+      ) : (
+        <div className="pt-[11px] text-small font-semibold text-mute leading-[1.6]">
+          {MASE_LINE}
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   CardHeader,
   ModelStrip,
   PageHeader,
+  Why,
   type KpiItem,
 } from "@/components";
 import { DriverPanel } from "@/components/workbench/DriverPanel";
@@ -571,28 +572,42 @@ export default async function WorkbenchPage({
                 selected={selected}
                 brand={brandsInScope.length > 1 ? brandId : undefined}
               />
-              <div className="mt-[15px] border-t border-rule pt-[13px] text-[11.5px] font-semibold leading-[1.6] text-mute">
-                <b className="text-ink">
-                  {triples.length} series readable
-                  {brandsInScope.length > 1 ? ` in ${brandId}` : ""}
-                </b>
-                <br />
-                These options are the combinations your session can actually
-                read. An out-of-scope pairing is never offered, because an
-                empty chart teaches you the system is broken rather than that
-                you are out of scope.
+              <div className="mt-[15px] border-t border-rule pt-[13px]">
+                <Why
+                  lead={
+                    <b className="text-ink">
+                      {triples.length} series readable
+                      {brandsInScope.length > 1 ? ` in ${brandId}` : ""}
+                    </b>
+                  }
+                  label="why only these"
+                  className="block"
+                >
+                  These options are the combinations your session can actually
+                  read. An out-of-scope pairing is never offered, because an
+                  empty chart teaches you the system is broken rather than that
+                  you are out of scope.
+                </Why>
               </div>
               {meanAvailabilityPct === null ? null : (
-                <div className="mt-[13px] border-t border-rule pt-[13px] text-[11.5px] font-semibold leading-[1.6] text-mute">
-                  <b className="text-ink tabular-nums">
-                    Availability {meanAvailabilityPct.toFixed(0)}%
-                  </b>
-                  <br />
-                  <span className="tabular-nums">{censoredWeeks}</span> of{" "}
-                  <span className="tabular-nums">{series.history.length}</span>{" "}
-                  weeks on this series ran below{" "}
-                  {(AVAILABILITY_FLOOR * 100).toFixed(0)}% and are
-                  demand-censored. Toggle them on the chart to see where.
+                <div className="mt-[13px] border-t border-rule pt-[13px]">
+                  <Why
+                    lead={
+                      <b className="text-ink tabular-nums">
+                        Availability {meanAvailabilityPct.toFixed(0)}%
+                      </b>
+                    }
+                    label="what is censored"
+                    className="block"
+                  >
+                    <span className="tabular-nums">{censoredWeeks}</span> of{" "}
+                    <span className="tabular-nums">
+                      {series.history.length}
+                    </span>{" "}
+                    weeks on this series ran below{" "}
+                    {(AVAILABILITY_FLOOR * 100).toFixed(0)}% and are
+                    demand-censored. Toggle them on the chart to see where.
+                  </Why>
                 </div>
               )}
             </CardBody>
@@ -659,7 +674,7 @@ export default async function WorkbenchPage({
                 }
               />
               <CardBody>
-                <AccuracyStatement accuracy={accuracy} variant="bars" />
+                <AccuracyStatement accuracy={accuracy} variant="bars" notesBehindWhy />
               </CardBody>
             </Card>
           )}

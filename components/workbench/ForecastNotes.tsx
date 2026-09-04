@@ -21,6 +21,8 @@
  * renders as an absent clause, never as a plausible one.
  */
 
+import { Why } from "@/components";
+
 export type CoverageNoteProps = {
   /** interval_coverage_calibrated, computed_value as a percentage. */
   coveragePct: number;
@@ -46,16 +48,19 @@ export function CoverageNote({
   className,
 }: CoverageNoteProps) {
   return (
-    <p
-      className={`text-[12.5px] leading-[1.6] text-body max-w-[88ch]${
-        className ? ` ${className}` : ""
-      }`}
+    <Why
+      lead={
+        <>
+          <b className="text-ink">
+            Band covers {pct1(coveragePct)} of realised weeks
+          </b>
+          {nominalPct === null ? null : <> against {pct1(nominalPct)} nominal</>}
+        </>
+      }
+      label="how it is measured, and why 3 folds not 4"
+      className={`block max-w-[88ch]${className ? ` ${className}` : ""}`}
     >
-      <b className="text-ink">
-        The band covers {pct1(coveragePct)} of realised weeks
-      </b>
-      {nominalPct === null ? null : <> against a {pct1(nominalPct)} nominal</>},
-      measured after split-conformal calibration rather than from the raw
+      Measured after split-conformal calibration rather than from the raw
       quantile heads. That figure is the mean of{" "}
       <b className="text-ink">{calibrationFolds} folds</b>, not the{" "}
       {accuracyFolds} behind the accuracy comparison beside it: conformal
@@ -63,7 +68,7 @@ export function CoverageNote({
       fold has no prior fold to calibrate against and drops out. The two counts
       differ by design, and saying so is the only way the difference is not
       later read as an inconsistency.
-    </p>
+    </Why>
   );
 }
 
@@ -97,22 +102,25 @@ export function CensoringNote({
     totalWeeks > 0 ? (censoredWeeks / totalWeeks) * 100 : null;
 
   return (
-    <p
-      className={`text-[12.5px] leading-[1.6] text-body max-w-[88ch]${
-        className ? ` ${className}` : ""
-      }`}
+    <Why
+      lead={
+        <>
+          <b className="text-ink tabular-nums">
+            {censoredWeeks} of {totalWeeks} weeks
+          </b>{" "}
+          demand-censored
+          {share === null ? null : <> ({share.toFixed(1)}%)</>}
+        </>
+      }
+      label="what that means for the history"
+      className={`block max-w-[88ch]${className ? ` ${className}` : ""}`}
     >
-      <b className="text-ink tabular-nums">
-        {censoredWeeks} of {totalWeeks} weeks
-      </b>{" "}
-      {share === null ? null : <>({share.toFixed(1)}%) </>}
-      on this axis ran below {pct1(thresholdPct)} availability
+      Those weeks ran below {pct1(thresholdPct)} availability
       {meanAvailabilityPct === null ? null : (
         <>, on a mean of {pct1(meanAvailabilityPct)}</>
       )}
-      . Those weeks are demand-censored: the shelf was empty, so what sold is a
-      floor on what was wanted rather than a measurement of it. That is why the
-      model trains on{" "}
+      . The shelf was empty, so what sold is a floor on what was wanted rather
+      than a measurement of it. That is why the model trains on{" "}
       {targetColumn === null ? (
         <>recovered unconstrained demand</>
       ) : (
@@ -120,6 +128,6 @@ export function CensoringNote({
       )}{" "}
       and not on sales, and why a censored week is greyed rather than quietly
       averaged into the history.
-    </p>
+    </Why>
   );
 }

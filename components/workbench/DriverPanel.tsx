@@ -1,4 +1,4 @@
-import { DriverBars, type Driver } from "@/components";
+import { DriverBars, Why, type Driver } from "@/components";
 import type { ShapDriver } from "@/lib/queries";
 
 /**
@@ -108,7 +108,11 @@ export function DriverPanel({ drivers, limit = 4 }: DriverPanelProps) {
     <DriverBars
       drivers={bars}
       footnote={
-        <>
+        <Why
+          lead={`${ranked.length} largest drivers, in units`}
+          label="how they were attributed"
+          className="block"
+        >
           {exact ? (
             <>
               <b className="text-ink">Exact tree SHAP</b>, in units and signed
@@ -126,7 +130,7 @@ export function DriverPanel({ drivers, limit = 4 }: DriverPanelProps) {
           These are the {ranked.length} largest contributions stored for this
           row, not the whole vector, so they rank the forecast rather than sum
           to it.
-        </>
+        </Why>
       }
     />
   );

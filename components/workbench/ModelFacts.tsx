@@ -18,6 +18,8 @@ import type { ReactNode } from "react";
  * this panel says so instead of claiming discipline it cannot see.
  */
 
+import { Why } from "@/components";
+
 export type ModelFactsProps = {
   modelVersion: string;
   engine: string;
@@ -92,6 +94,14 @@ export function ModelFacts({
         )}
       </Fact>
 
+      {/* Three facts a reader consults rather than reads. Engine, version
+          and generated-at stay out because they identify the run; these
+          describe how it was built. */}
+      <Why
+        lead="Target, scoring and horizon discipline"
+        label="show"
+        className="block border-t border-rule pt-[10px]"
+      >
       <Fact label="Target">
         <span className="font-mono text-[11px]">{targetColumn}</span>
         <div className="mt-[2px] text-[11.5px] font-semibold text-mute leading-[1.55]">
@@ -136,6 +146,7 @@ export function ModelFacts({
           </>
         )}
       </Fact>
+      </Why>
 
       <Fact label="Version">
         <span className="font-mono text-[11px]">{modelVersion}</span>
