@@ -5,6 +5,7 @@ import {
   DataTable,
   Pill,
   SeriesName,
+  Why,
   type Column,
 } from "@/components";
 
@@ -175,7 +176,13 @@ export function RecommendationTable({ rows }: RecommendationTableProps) {
         )} of its planned life, or holding cover under its category ceiling, is a buy or allocation matter and is answered on those screens.`}
       />
       <CardBody>
-        <p className="max-w-[92ch] text-copy leading-[1.6] text-body">
+        {/* The formula is the reason the column is checkable, so it stays --
+            one toggle under the rows rather than a paragraph above them. */}
+        <Why
+          lead="Cost of waiting is recomputed here, not stored, so you can check it."
+          label="the formula"
+          className="block max-w-[92ch]"
+        >
           Cost of waiting is not stored: it is{" "}
           <span className="font-mono text-[11px] text-ink">
             margin_saved / (projected_leftover_units x list_price_inr)
@@ -192,18 +199,19 @@ export function RecommendationTable({ rows }: RecommendationTableProps) {
                 MAX_DEPTH * 100,
               )}% ceiling. On those the depth has stopped being the variable: the cut is as deep as policy allows at both dates and only the runway moves, so what the wait actually costs is stranded stock rather than margin per unit. At that much cover against that little life, most of the loss was bought in rather than mistimed, and the buy plan is where it gets fixed next season.`
             : ""}
-        </p>
+        </Why>
         {pooled.length > 0 ? (
-          <p className="mt-[10px] max-w-[92ch] text-copy leading-[1.6] text-body">
-            {pooled.length}{" "}
-            {pooled.length === 1 ? "row rests" : "rows rest"} on a pooled
-            coefficient rather than their category&apos;s own fit --{" "}
+          <Why
+            lead={`${pooled.length} ${pooled.length === 1 ? "row rests" : "rows rest"} on a pooled coefficient, not their category's own fit.`}
+            label="what that weakens"
+            className="mt-[10px] block max-w-[92ch]"
+          >
             {[...new Set(pooled.map((row) => row.categoryLabel))].join(", ")}.
             The depth is still derived, but it is derived from the brand&apos;s
             average price response rather than from that category&apos;s, so it
             is the weaker of the two claims on this page. The provenance panel
             below says how weak, in the category&apos;s own R-squared.
-          </p>
+          </Why>
         ) : null}
       </CardBody>
     </Card>

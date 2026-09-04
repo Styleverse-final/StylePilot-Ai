@@ -5,6 +5,7 @@ import {
   CardHeader,
   DataTable,
   Pill,
+  Why,
   type Column,
 } from "@/components";
 
@@ -127,23 +128,14 @@ const COLUMNS: ReadonlyArray<Column<CategoryFit>> = [
       </Pill>
     ),
   },
-  {
-    key: "verdict",
-    header: "How far a depth from it carries",
-    cell: (fit) => (
-      <span className="text-[11.5px] font-semibold leading-[1.5] text-body">
-        {fit.isPooled
-          ? `Its own fit explains ${formatR2(
-              fit.rSquared,
-            )}, under the ${MIN_R2.toFixed(
-              2,
-            )} floor, so the brand's pooled coefficient shipped instead. A depth from this row is the brand's average price response, not this category's -- treat it as the weakest recommendation on the screen.`
-          : `Fitted on its own promotions and cleared the ${MIN_R2.toFixed(
-              2,
-            )} floor, so a depth from this row is this category's own measured price response.`}
-      </span>
-    ),
-  },
+  // DELETED: "How far a depth from it carries".
+  //
+  // It rendered one of two sentences per row, and on this brand every row got
+  // the same one -- six verbatim copies of the same 23 words, 138 words of
+  // column saying what the "Own fit" badge two columns left already says. The
+  // pooled variant is the only one that carried anything extra, and that is
+  // now the sentence under the table, shown only when a row is actually
+  // pooled. Both sentences are preserved in the panel's Why.
 ];
 
 export function ElasticityPanel({
@@ -234,7 +226,16 @@ export function ElasticityPanel({
       />
 
       <CardBody>
-        <p className="max-w-[92ch] text-copy leading-[1.6] text-body">
+        {/* Four paragraphs explaining a table that already carries the
+            coefficient, the fit quality, the promotion count and the
+            source. All of it is true and none of it should cost a reader
+            the table below. */}
+        <Why
+          lead={`Every depth here is priced off ${brandId}'s own fitted elasticity.`}
+          label="the fit, the rails and where the numbers come from"
+          className="block max-w-[92ch]"
+        >
+        <span className="block">
           The form is not assumed, it is fitted:{" "}
           <span className="font-mono text-[11px] text-ink">
             {fits[0]
@@ -260,9 +261,9 @@ export function ElasticityPanel({
               } below that promotion count`
             : ", and no category here is short of that count"}
           .
-        </p>
+        </span>
 
-        <p className="mt-[10px] max-w-[92ch] text-copy leading-[1.6] text-body">
+        <span className="mt-[10px] block">
           <b className="text-ink">
             A depth resting on a pooled coefficient is weaker than one resting
             on a category fit.
@@ -288,10 +289,10 @@ export function ElasticityPanel({
               } above ${
                 pooled.length === 1 ? "is" : "are"
               } marked in the table, in the Fit column of the recommendations, and in the banner -- three places, because a planner who misses it has been misled by the screen rather than by the model.`}
-        </p>
+        </span>
 
         {ledger ? (
-          <p className="mt-[10px] max-w-[92ch] text-copy leading-[1.6] text-body">
+          <span className="mt-[10px] block">
             <b className="text-ink">Nothing future-dated entered the fit.</b>{" "}
             The {brandId} workbook holds {ledger.promotionsInWorkbook}{" "}
             promotions. {ledger.plannedExcluded} of them carry status PLANNED
@@ -312,10 +313,10 @@ export function ElasticityPanel({
             the {formatFractionPct(MAX_DEPTH, 0)} cap on a recommended cut is a
             hard stop rather than a working value: it already sits well outside
             the range the curve was fitted over.
-          </p>
+          </span>
         ) : null}
 
-        <p className="mt-[10px] max-w-[92ch] text-small leading-[1.6] text-mute">
+        <span className="mt-[10px] block">
           Provenance of the numbers in this panel. Read from the database: the
           coefficients, intercepts, R-squareds, promotion counts and pooled
           flags are rows in{" "}
@@ -328,9 +329,9 @@ export function ElasticityPanel({
           record -- the fit is a property of the brand, not of your scope, and
           hiding the rest of it would misrepresent the model rather than
           protect anything.
-        </p>
+        </span>
 
-        <p className="mt-[8px] max-w-[92ch] text-small leading-[1.6] text-mute">
+        <span className="mt-[8px] block">
           Not read from the database, because no table holds them. There are{" "}
           {ledger ? "nine" : "three"} such figures on this panel and these are
           all of them. Three are pipeline policy thresholds -- the{" "}
@@ -349,7 +350,8 @@ export function ElasticityPanel({
                 1,
               )}. The fit publishes its drop ledger to a log rather than to the database, so all six were measured by re-running its exclusion rule over the ${brandId} promotion workbook itself. ${PIPELINE_SOURCE} states the end of history, the window and the deepest observed discount, and the workbook agrees with it on all three; the shallowest observed discount is stated nowhere in ${PIPELINE_SOURCE} and is a direct reading of the workbook, so it is quoted here as that and not as a pipeline figure.`
             : ` This brand has no drop ledger on file, so the paragraph on what was kept out of the fit is absent rather than filled in from another brand's counts.`}
-        </p>
+        </span>
+        </Why>
       </CardBody>
     </Card>
   );

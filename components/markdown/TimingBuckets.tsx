@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Pill } from "@/components";
+import { Card, CardBody, CardHeader, Pill, Why } from "@/components";
 
 import { DELAY_WEEKS, NOW_MARGIN_TRIGGER_PCT } from "./constants";
 import { formatCount, formatFractionPct, formatInr } from "./format";
@@ -103,7 +103,14 @@ export function TimingBuckets({ rows }: TimingBucketsProps) {
           );
         })}
 
-        <p className="mt-[14px] max-w-[62ch] text-copy leading-[1.6] text-body">
+        {/* Two paragraphs of argument for a two-bar chart. The bars carry the
+            counts; the reason the third bar does not exist is worth having and
+            is not worth 170 words above the table it belongs to. */}
+        <Why
+          lead="NOW or HOLD only."
+          label={`why WEEK_${DELAY_WEEKS} can never fire`}
+          className="mt-[14px] block max-w-[62ch]"
+        >
           There is no third bucket, and its absence is arithmetic rather than a
           quiet week. The scorer can also write{" "}
           <span className="font-mono text-[11px] text-ink">
@@ -121,16 +128,18 @@ export function TimingBuckets({ rows }: TimingBucketsProps) {
           volume would break that dominance. Until then a third column here
           would be permanently empty, which reads as broken rather than as
           proven.
-        </p>
+          <span className="mt-[8px] block">
+            The split between the two is the{" "}
+            {formatFractionPct(NOW_MARGIN_TRIGGER_PCT, 0)} trigger and nothing
+            else: cut now where waiting costs more than that share of the
+            leftover&apos;s value at list, hold where it costs less.
+          </span>
+        </Why>
 
-        <p className="mt-[10px] max-w-[62ch] text-small leading-[1.6] text-mute">
-          The split between the two is the{" "}
-          {formatFractionPct(NOW_MARGIN_TRIGGER_PCT, 0)} trigger and nothing
-          else: cut now where waiting costs more than that share of the
-          leftover&apos;s value at list, hold where it costs less. Across the{" "}
-          {formatCount(total)} {total === 1 ? "style" : "styles"} you can see,
-          the gap between acting today and acting at the next review is worth{" "}
-          <b className="text-ink tabular-nums">{formatInr(totalSaved)}</b>.
+        {/* The one figure from that paragraph a planner acts on stays out. */}
+        <p className="mt-[8px] max-w-[62ch] text-small leading-[1.6] text-mute">
+          Worth <b className="text-ink tabular-nums">{formatInr(totalSaved)}</b>{" "}
+          across {formatCount(total)} {total === 1 ? "style" : "styles"}.
         </p>
 
         {unexpected.length > 0 ? (

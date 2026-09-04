@@ -3,11 +3,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
-  Banner,
   Card,
   CardBody,
   ModelStrip,
   PageHeader,
+  Why,
   type KpiItem,
 } from "@/components";
 import { DepthCurve } from "@/components/markdown/DepthCurve";
@@ -323,30 +323,6 @@ export default async function MarkdownPage({
         kpis={headerKpis(rows)}
       />
 
-      <Banner
-        variant="violet"
-        icon="%"
-        title="Waiting does not make the pile smaller. It makes the cut deeper."
-        measureCh={104}
-      >
-        A style holding more weeks of cover than it has weeks of life left
-        will strand the difference unless the sell rate is lifted. Clearing it
-        this week needs the rate multiplied by cover over remaining life;
-        clearing it at the next review needs it multiplied by{" "}
-        <span className="font-mono text-[11px] text-ink">
-          (cover - {DELAY_WEEKS}) / (life - {DELAY_WEEKS})
-        </span>
-        . {DELAY_WEEKS} weeks of ordinary trading take {DELAY_WEEKS} weeks off
-        both the pile and the runway, and because the runway is the smaller
-        number it loses proportionally more -- so on every overstocked style
-        the second ratio is strictly the larger, and the depth that answers it
-        is strictly deeper. That is the entire mechanism behind this screen,
-        and the {DELAY_WEEKS}-week lag being priced is the case&apos;s own
-        description of an in-season cycle: a weekly report, a meeting, then an
-        execution window. It is a premise of the case study, taken from{" "}
-        {PIPELINE_SOURCE}, not something measured in this data.
-      </Banner>
-
       {readError ? (
         <Explain>
           The markdown plan could not be read: {readError}. Nothing has been
@@ -355,7 +331,52 @@ export default async function MarkdownPage({
         </Explain>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-[16px] xl:grid-cols-[1.45fr_1fr]">
+          {/* The thesis of the screen, in one sentence, immediately above the
+              rows it applies to. The mechanism behind it is 157 words and it
+              used to sit between the reader and the table. */}
+          <Why
+            lead="Waiting does not make the pile smaller. It makes the cut deeper."
+            label="the mechanism"
+            className="mb-[12px] block max-w-[104ch]"
+          >
+            A style holding more weeks of cover than it has weeks of life left
+            will strand the difference unless the sell rate is lifted. Clearing
+            it this week needs the rate multiplied by cover over remaining life;
+            clearing it at the next review needs it multiplied by{" "}
+            <span className="font-mono text-[11px] text-ink">
+              (cover - {DELAY_WEEKS}) / (life - {DELAY_WEEKS})
+            </span>
+            . {DELAY_WEEKS} weeks of ordinary trading take {DELAY_WEEKS} weeks
+            off both the pile and the runway, and because the runway is the
+            smaller number it loses proportionally more -- so on every
+            overstocked style the second ratio is strictly the larger, and the
+            depth that answers it is strictly deeper. That is the entire
+            mechanism behind this screen, and the {DELAY_WEEKS}-week lag being
+            priced is the case&apos;s own description of an in-season cycle: a
+            weekly report, a meeting, then an execution window. It is a premise
+            of the case study, taken from {PIPELINE_SOURCE}, not something
+            measured in this data.
+          </Why>
+
+          <RecommendationTable rows={rows} />
+
+          <div className="mt-[16px]">
+            <TimingBuckets rows={rows} />
+          </div>
+
+          <div className="mt-[16px]">
+            <ElasticityPanel
+              fits={fits}
+              rows={rows}
+              brandId={brandId}
+              ledger={ledger}
+            />
+          </div>
+
+          {/* Below the fold from here: the curve, the per-style rationales and
+              the empty-state note. All of it is worth having and none of it is
+              worth crossing to reach three rows of recommendations. */}
+          <div className="mt-[16px]">
             {focus ? (
               <DepthCurve
                 row={focus.row}
@@ -367,7 +388,15 @@ export default async function MarkdownPage({
             ) : refusedRequest ? (
               <Card>
                 <CardBody>
-                  <p className="max-w-[88ch] text-copy leading-[1.6] text-body">
+                  <Why
+                    lead={
+                      requestedRow
+                        ? `${wanted} is in your scope and in the table, but has no curve.`
+                        : `No recommendation for ${wanted} is readable in your scope.`
+                    }
+                    label="why"
+                    className="block max-w-[88ch]"
+                  >
                     {requestedRow ? (
                       <>
                         <b className="text-ink">{wanted}</b> is in your scope
@@ -401,7 +430,7 @@ export default async function MarkdownPage({
                           rows.length === 1 ? "style" : "styles"
                         } in scope can be charted.`
                       : "No style in your scope can be charted at all."}
-                  </p>
+                  </Why>
                   {choices.length > 0 ? (
                     <div className="mt-[12px] flex flex-wrap gap-[6px]">
                       {choices.map((choice) => (
@@ -420,40 +449,30 @@ export default async function MarkdownPage({
             ) : (
               <Card>
                 <CardBody>
-                  <p className="max-w-[88ch] text-copy leading-[1.6] text-body">
+                  <Why
+                    lead={`No curve: every style in scope is at the ${formatFractionPct(MAX_DEPTH, 0)} ceiling.`}
+                    label="why that stops a curve being drawn"
+                    className="block max-w-[88ch]"
+                  >
                     No curve is drawn because no style in your scope carries a
-                    recoverable price point. The curve is the fitted
-                    elasticity inverted around the depth a style trades at
-                    today, and that depth is not stored on the recommendation
-                    -- it is recovered from the recommendation&apos;s own
-                    arithmetic. Where the stored depth was clamped, at the{" "}
+                    recoverable price point. The curve is the fitted elasticity
+                    inverted around the depth a style trades at today, and that
+                    depth is not stored on the recommendation -- it is recovered
+                    from the recommendation&apos;s own arithmetic. Where the
+                    stored depth was clamped, at the{" "}
                     {formatFractionPct(MAX_DEPTH, 0)} ceiling or at zero, the
-                    clamp destroyed the information the inversion needs.
-                    Drawing a curve anyway would mean choosing an anchor,
-                    which is a drawing rather than a derivation, so the screen
-                    shows you the stored figures instead and stops there.
-                  </p>
+                    clamp destroyed the information the inversion needs. Drawing
+                    a curve anyway would mean choosing an anchor, which is a
+                    drawing rather than a derivation, so the screen shows you
+                    the stored figures instead and stops there.
+                  </Why>
                 </CardBody>
               </Card>
             )}
-            <TimingBuckets rows={rows} />
-          </div>
-
-          <div className="mt-[16px]">
-            <RecommendationTable rows={rows} />
           </div>
 
           <div className="mt-[16px]">
             <RationaleList rows={rows} />
-          </div>
-
-          <div className="mt-[16px]">
-            <ElasticityPanel
-              fits={fits}
-              rows={rows}
-              brandId={brandId}
-              ledger={ledger}
-            />
           </div>
 
           {rows.length === 0 ? (
