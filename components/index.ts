@@ -62,8 +62,6 @@ export type {
 export { DriverBars, DriverBar, formatUnits, formatUnitsAbs } from "./DriverBars";
 export type { DriverBarsProps, DriverBarProps, Driver } from "./DriverBars";
 
-export { ThreadBand } from "./ThreadBand";
-export type { ThreadBandProps, ThreadClass } from "./ThreadBand";
 
 export { StatBlock, Stat } from "./StatBlock";
 export type { StatBlockProps, StatProps, StatTone } from "./StatBlock";

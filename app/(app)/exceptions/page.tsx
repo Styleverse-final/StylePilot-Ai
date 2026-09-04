@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   AccuracyStatement,
@@ -291,13 +292,24 @@ function toExceptionView(
 
 // --------------------------------------------------------------------- page
 
-export default async function ExceptionsPage() {
+/** First value only; a repeated query parameter arrives as an array. */
+function one(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+export default async function ExceptionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const planner = await getSessionPlanner();
   const brandId = planner?.brandId ?? null;
   const brand: BrandId | undefined =
     brandId === "SPD" || brandId === "ECO" ? brandId : undefined;
 
   const sb = await createServerAnonClient();
+  const params = await searchParams;
 
   const [rows, policies, touchless, accuracies, labels] = await Promise.all([
     brandId
@@ -325,6 +337,22 @@ export default async function ExceptionsPage() {
   const stockout = views.filter((v) => v.isStockout);
   const overstock = views.filter((v) => !v.isStockout);
   const undecided = views.filter((v) => v.status === null).length;
+
+  // ?status=open -- the exceptions carrying no decision row.
+  //
+  // WHAT THIS IS NOT. The dashboard's escalated count comes from
+  // agent_run.items_escalated, a counter on the run, and nothing in the schema
+  // marks WHICH recommendations an agent escalated -- there is no per-row flag
+  // to filter on, so there is no "filtered to escalated" view to build. What a
+  // reader can be shown instead is true and is the work: the exceptions in
+  // their own scope that nobody has decided. The two counts differ, and the
+  // notice below says which one they are looking at rather than letting the
+  // difference read as a bug.
+  //
+  // Any other value of the parameter is ignored rather than rejected: a filter
+  // nobody can name is not worth a 404, and the queue is correct unfiltered.
+  const filterOpen = one(params.status) === "open";
+  const queue = filterOpen ? views.filter((v) => v.status === null) : views;
   const sumValue = (list: readonly ExceptionView[]): number =>
     list.reduce((total, view) => total + (view.valueAtStakeInr ?? 0), 0);
 
@@ -395,7 +423,25 @@ export default async function ExceptionsPage() {
         </p>
       ) : null}
 
-      <ExceptionQueue rows={views} scopeLabel={scopeLabel} />
+      {filterOpen ? (
+        <p className="mb-[10px] flex flex-wrap items-baseline gap-x-[9px] text-[12px] font-semibold text-mute">
+          <span>
+            Showing the{" "}
+            <span className="font-extrabold text-ink tabular">{undecided}</span>{" "}
+            exception{undecided === 1 ? "" : "s"} in your scope with no decision
+            on {undecided === 1 ? "it" : "them"}, of{" "}
+            <span className="tabular">{views.length}</span>.
+          </span>
+          <Link
+            href="/exceptions"
+            className="font-bold text-orangeD underline underline-offset-2"
+          >
+            Show all {views.length}
+          </Link>
+        </p>
+      ) : null}
+
+      <ExceptionQueue rows={queue} scopeLabel={scopeLabel} />
 
       <div className="mt-[16px]">
         <TouchlessBanner touchless={touchless} />

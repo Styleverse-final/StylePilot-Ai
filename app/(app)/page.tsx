@@ -178,6 +178,12 @@ export default async function DashboardPage() {
   const openValueInr = sumValue(open);
   const openWithoutValue = open.length - valuedCount(open);
 
+  // The exceptions THIS reader can act on. DecisionThreads counts the brand's
+  // whole programme, because that is what v_touchless_rate measures; this is
+  // the part of it that is actually theirs, and the panel labels the two
+  // differently rather than letting a brand total read as a personal queue.
+  const openExceptions = open.filter((row) => row.rec_type === "EXCEPTION");
+
   const decided = recommendations.filter(
     (row) => row.status === "APPROVED" || row.status === "MODIFIED",
   );
@@ -311,6 +317,8 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-[16px]">
           <DecisionThreads
             touchless={touchless}
+            openExceptionCount={openExceptions.length}
+            openExceptionValueInr={sumValue(openExceptions)}
             headerTag={
               embargoLocked ? (
                 <span className="rounded-pill bg-amberW px-[12px] py-[5px] text-[11.5px] font-bold text-amber">
