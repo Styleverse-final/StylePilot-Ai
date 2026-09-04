@@ -202,6 +202,16 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
 
   const sb = await createServerAnonClient();
 
+  // STARTED HERE, AWAITED AT THE END.
+  //
+  // readStageBands reads autonomy_band, which carries no brand filter and so
+  // depends on nothing above it. It used to sit in a Promise.all AFTER the
+  // scope reads, which meant a round trip that could have overlapped them was
+  // instead queued behind them. Kicking it off now costs nothing and takes it
+  // off the critical path entirely. The .catch() is attached at creation, so
+  // a rejection is handled even though the await is much later.
+  const stageBandsPromise = readStageBands(sb).catch(() => []);
+
   // Scope first: nothing else can be read until we know which brands row
   // level security returned, and the switcher is built from that set.
   let scope: PortfolioScope = {
@@ -253,13 +263,15 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
   // below filters on that brand list, so running them would send an empty
   // IN clause to PostgREST for no benefit. They are skipped, and the screen
   // says why rather than rendering five panels of dashes.
-  // The cycle panel's two inputs. Both fail soft: with no bands readable
-  // the classifier cannot promote any stage to AUTOMATED, which is the safe
-  // direction -- it under-claims automation rather than over-claiming it.
-  const [stageBands, countsByType] = await Promise.all([
-    readStageBands(sb).catch(() => []),
-    readCountsByType(sb, scope.brandIds).catch(() => ({})),
-  ]);
+  // The cycle panel's other input. It needs the resolved scope, so it cannot
+  // start earlier than this -- but nothing in the five blocks below needs IT,
+  // so awaiting it here would have stalled them behind a round trip they do
+  // not depend on. Started now, awaited after they finish.
+  //
+  // Both cycle-panel inputs fail soft: with no bands readable the classifier
+  // cannot promote any stage to AUTOMATED, which is the safe direction -- it
+  // under-claims automation rather than over-claiming it.
+  const countsPromise = readCountsByType(sb, scope.brandIds).catch(() => ({}));
 
   const hasScope = !scopeError && scope.brandIds.length > 0;
 
@@ -322,6 +334,13 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
     if (openResult.status === "fulfilled") undecided = openResult.value;
     else undecidedError = message(openResult.reason);
   }
+
+  // Both cycle-panel reads were started earlier and overlapped everything
+  // above; this is where their results are finally needed.
+  const [stageBands, countsByType] = await Promise.all([
+    stageBandsPromise,
+    countsPromise,
+  ]);
 
   const findings = adoptionFindings(adoption);
 
