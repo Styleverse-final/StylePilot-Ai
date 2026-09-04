@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { SPARK, useCopilot } from "./CopilotDrawer";
 import { UserChip } from "./UserChip";
@@ -75,7 +75,68 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/**
+ * PREFETCH ON INTENT, NOT ON ARRIVAL.
+ *
+ * Next's <Link prefetch> has three settings and none of them is "hover only":
+ *
+ *   auto (default)  viewport AND hover, but for a DYNAMIC route it fetches
+ *                   only down to the nearest loading.js boundary. Every route
+ *                   here is dynamic and app/(app)/loading.tsx is that
+ *                   boundary, so the default was prefetching the skeleton and
+ *                   none of the data. That is why a tab lights up instantly
+ *                   and then sits there: the shell was ready, the rows were
+ *                   not.
+ *   true            full route, but STILL on viewport entry as well as hover.
+ *                   The nav is a fixed bar, so every link is permanently in
+ *                   the viewport -- prefetch={true} would fire all thirteen
+ *                   full server renders the moment the shell mounts, each one
+ *                   resolving identity, all competing with the screen the
+ *                   reader is waiting for on the same hobby-plan lambda.
+ *   false           never, on viewport OR hover.
+ *
+ * So hover-only is not reachable through the prop, and the two obvious moves
+ * are both wrong:
+ *
+ *   prefetch={true}   fires thirteen full renders on mount.
+ *   prefetch={false}  throws away the one thing prefetch currently buys.
+ *
+ * MEASURED, on a production build, against this database:
+ *
+ *   route         navigation payload   partial prefetch
+ *   /exceptions      37,146 B               264 B
+ *   /markdown        44,440 B               260 B
+ *   /buy             66,193 B               250 B
+ *
+ * Those 250 bytes are the shell. Cheap, already happening, and the reason a
+ * tab responds the instant it is clicked. Turning it off to add a hover
+ * prefetch would trade a working thing for an unproven one.
+ *
+ * So the default is left alone and the hover is ADDITIVE: the shell still
+ * prefetches on mount for 250 bytes a route, and hovering additionally pulls
+ * the full payload. Worst case the hover buys nothing and the screen behaves
+ * exactly as it does today; it cannot be worse.
+ *
+ * router.prefetch() fetches the FULL route, and per the staleTimes docs a
+ * route fetched this way is held under `static` (180s here), not `dynamic`
+ * (30s) -- the longer window, because a deliberate prefetch is treated the
+ * same as a fully-prefetched link.
+ */
+const prefetched = new Set<string>();
+
+function usePrefetchOnce() {
+  const router = useRouter();
+  return (href: string) => {
+    // Once per mount. Hovering along a row of tabs would otherwise re-fire on
+    // every re-entry, and each one is a real server render.
+    if (prefetched.has(href)) return;
+    prefetched.add(href);
+    router.prefetch(href);
+  };
+}
+
 export function TopNav({ exceptionCount, user }: TopNavProps) {
+  const prefetchOnce = usePrefetchOnce();
   const { primary, secondary, more } = navFor(user?.role);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -118,6 +179,9 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
       <Link
         key={item.href}
         href={item.href}
+        onMouseEnter={() => prefetchOnce(item.href)}
+        onFocus={() => prefetchOnce(item.href)}
+        onTouchStart={() => prefetchOnce(item.href)}
         className={`${TAB_BASE} ${tone}`}
         aria-current={active ? "page" : undefined}
       >
