@@ -25,22 +25,34 @@ import { createServerAnonClient } from "@/lib/supabase";
  * is read under RLS with the caller's own session.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const planner = await getSessionPlanner();
-  if (!planner) redirect("/login");
+  // BOTH AT ONCE. These used to run in sequence, and the pip count -- a badge
+  // number that does not depend on the planner at all -- sat behind the whole
+  // identity resolution. That put TWO sequential round trips in front of the
+  // first byte of EVERY route in the app, including the loading skeleton.
+  //
+  // Nothing here needs the other's result, so nothing waits. If the session
+  // turns out to be missing we redirect and the count is wasted, which costs
+  // one query on a request that was going to be thrown away anyway.
+  const countExceptions = async (): Promise<number | undefined> => {
+    try {
+      const sb = await createServerAnonClient();
+      const { count } = await sb
+        .from("recommendation")
+        .select("id", { count: "exact", head: true })
+        .eq("rec_type", "EXCEPTION");
+      return count ?? undefined;
+    } catch {
+      // A nav that cannot count is still a usable nav; drop the pip rather
+      // than fail the whole shell.
+      return undefined;
+    }
+  };
 
-  let exceptionCount: number | undefined;
-  try {
-    const sb = await createServerAnonClient();
-    const { count } = await sb
-      .from("recommendation")
-      .select("id", { count: "exact", head: true })
-      .eq("rec_type", "EXCEPTION");
-    exceptionCount = count ?? undefined;
-  } catch {
-    // A nav that cannot count is still a usable nav; drop the pip rather
-    // than fail the whole shell.
-    exceptionCount = undefined;
-  }
+  const [planner, exceptionCount] = await Promise.all([
+    getSessionPlanner(),
+    countExceptions(),
+  ]);
+  if (!planner) redirect("/login");
 
   async function signOut() {
     "use server";
