@@ -1,3 +1,23 @@
+/**
+ * proxy.ts -- formerly middleware.ts.
+ *
+ * WHY THIS FILE WAS RENAMED, and it was not cosmetic.
+ *
+ * Next 16 deprecated the `middleware` convention in favour of `proxy`, and the
+ * two differ in the thing that matters here: middleware ran on the EDGE
+ * runtime, proxy defaults to NODE.JS. On Edge there is no `__dirname`, and a
+ * dependency in this file's import graph reaches for it -- so production threw
+ *
+ *     ReferenceError: __dirname is not defined    at /middleware
+ *
+ * on every request, returning 500 for every route including /login. It never
+ * appeared locally, because `next dev` runs this in a Node-ish context; only
+ * the deployed Edge runtime is strict enough to break. Every build printed the
+ * deprecation notice, which was the warning for exactly this.
+ *
+ * `runtime` cannot be configured in a proxy file. It is Node.js, which is what
+ * this needs.
+ */
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -21,7 +41,7 @@ const FALLBACK_PATH = '/'
 /** Control characters (CR and LF included), DEL, and backslash. */
 const UNSAFE_PATH_CHARS = /[\u0000-\u001F\u007F\\]/
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isPublic = isPublicPath(pathname)
 
