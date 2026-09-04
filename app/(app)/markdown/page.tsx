@@ -92,6 +92,57 @@ export const metadata: Metadata = {
 /** How many styles the curve selector offers before it becomes a wall. */
 const MAX_CURVE_CHOICES = 8;
 
+/**
+ * The one sentence the screen was making the reader derive.
+ *
+ * The table has always carried everything needed to reach it -- depth against
+ * the ceiling, cover against remaining life, the timing call -- and left the
+ * reader to hold six rows in their head and notice the pattern. Most will not,
+ * and the pattern is the finding: where the depth is already at the policy
+ * cap, markdown TIMING is not the lever, because the cut is as deep as policy
+ * allows at both dates and only the runway moves.
+ *
+ * Everything here is folded from rows already on the page. No new query, no
+ * stored figure, and no number that is not visible in the table beneath it.
+ */
+function inference(rows: readonly MarkdownRow[]): string | null {
+  if (rows.length === 0) return null;
+
+  const atCap = rows.filter((row) => row.recommendedDepth >= MAX_DEPTH - 1e-9);
+  const now = rows.filter((row) => row.timing === "NOW");
+
+  // The worst overstock on the page, by cover against the life left to sell
+  // it in. Guarded: a style with no remaining life would divide by zero, and
+  // it is a real state rather than a bad row, so it is skipped rather than
+  // clamped into a ratio that would sort to the top.
+  const ranked = rows
+    .filter((row) => row.remainingLifeWeeks > 0)
+    .map((row) => ({ row, ratio: row.coverWeeks / row.remainingLifeWeeks }))
+    .sort((a, b) => b.ratio - a.ratio);
+  const worst = ranked[0] ?? null;
+
+  const parts: string[] = [];
+  if (atCap.length > 0) {
+    parts.push(
+      `${atCap.length} of ${rows.length} ${
+        atCap.length === 1 ? "style is" : "styles are"
+      } already at the ${formatFractionPct(MAX_DEPTH, 0)} cap, where timing is not the lever`,
+    );
+  }
+  if (worst && worst.ratio >= 2) {
+    parts.push(
+      `${worst.row.styleId} holds ${worst.ratio.toFixed(1)}x the cover its remaining life can clear`,
+    );
+  }
+  parts.push(
+    `${now.length} of ${rows.length} clear the ${formatFractionPct(
+      NOW_MARGIN_TRIGGER_PCT,
+      0,
+    )} trigger`,
+  );
+  return `${parts.join(". ")}.`;
+}
+
 type Chartable = { row: MarkdownRow; curve: Curve };
 
 function Explain({ children }: { children: ReactNode }) {
@@ -357,6 +408,15 @@ export default async function MarkdownPage({
             of the case study, taken from {PIPELINE_SOURCE}, not something
             measured in this data.
           </Why>
+
+          {/* The finding, stated rather than left to be derived from the rows
+              below it. Folded from those same rows, so it cannot disagree
+              with them. */}
+          {inference(rows) === null ? null : (
+            <p className="mb-[12px] max-w-[104ch] text-[13px] font-bold leading-[1.55] text-ink">
+              {inference(rows)}
+            </p>
+          )}
 
           <RecommendationTable rows={rows} />
 
