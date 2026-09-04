@@ -1,3 +1,5 @@
+import { cache } from 'react'
+
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -93,7 +95,7 @@ export type SessionPlanner = {
  * Returns null when signed out, when the deployment is unconfigured, or when
  * the access token no longer validates against the auth server.
  */
-export async function getSessionPlanner(): Promise<SessionPlanner | null> {
+export const getSessionPlanner = cache(async function getSessionPlanner(): Promise<SessionPlanner | null> {
   const supabase = await createServerSupabaseClient()
   if (!supabase) {
     return null
@@ -108,41 +110,40 @@ export async function getSessionPlanner(): Promise<SessionPlanner | null> {
     return null
   }
 
+  // ONE RPC, NOT TWO.
+  //
+  // current_planner() returns an entire dim_planner row, and that row already
+  // carries app_role. current_app_role() reads the SAME row under the SAME
+  // predicate (auth_user_id = auth.uid() AND is_active), differing only in
+  // substituting 'anonymous' when no row exists. The second call was asking
+  // the database a question the first had already answered, at the cost of a
+  // full network round trip on every render.
+  //
   // A TRANSIENT failure here must not be mistaken for "this user has no
-  // planner record".
-  //
-  // These two RPCs run once in the layout and again in every screen, so a
-  // single page view makes several of them. If one fails transiently -- a
-  // dropped connection, a rate limit -- and the error is ignored, `data` is
-  // null, every field below resolves to null, and this function returns a
-  // SessionPlanner that is signed in but anonymous. Screens then read a
-  // brandId of null and either render the wrong thing or throw, which is
-  // precisely the intermittent 500 and half-rendered page this code caused.
-  //
-  // Accountability hangs off this value, so a half-resolved identity is worse
-  // than no identity at all. Retry once, then fail closed: returning null
-  // sends the caller to sign in again, which is recoverable and honest. A
-  // planner who genuinely has no row still returns cleanly with a null
-  // employeeId, because that is a successful call with no data rather than a
-  // failed one.
-  const resolve = async () =>
-    Promise.all([
-      supabase.rpc('current_planner'),
-      supabase.rpc('current_app_role'),
-    ])
+  // planner record". If the call fails and the error is ignored, every field
+  // below resolves to null and this returns a SessionPlanner that is signed
+  // in but anonymous -- which is what caused the intermittent 500s and the
+  // half-rendered page in Phase 5. Accountability hangs off this value, so a
+  // half-resolved identity is worse than no identity: retry once, then fail
+  // closed. A planner who genuinely has no row still returns cleanly, because
+  // that is a successful call with no data rather than a failed one.
+  const resolve = () => supabase.rpc('current_planner')
 
-  let [plannerResult, roleResult] = await resolve()
-  if (plannerResult.error || roleResult.error) {
-    ;[plannerResult, roleResult] = await resolve()
+  let plannerResult = await resolve()
+  if (plannerResult.error) {
+    plannerResult = await resolve()
   }
-  if (plannerResult.error || roleResult.error) {
+  if (plannerResult.error) {
     return null
   }
 
-  const plannerRaw: unknown = plannerResult.data
-  const roleRaw: unknown = roleResult.data
+  const planner = firstRecord(plannerResult.data)
 
-  const planner = firstRecord(plannerRaw)
+  // Exactly what current_app_role() would have returned: the row's app_role,
+  // or 'anonymous' when the caller has no planner row at all.
+  const roleRaw: unknown = planner
+    ? readString(planner, 'app_role', 'appRole')
+    : 'anonymous'
 
   return {
     userId: user.id,
@@ -153,7 +154,7 @@ export async function getSessionPlanner(): Promise<SessionPlanner | null> {
     brandId: readString(planner, 'brand_id', 'brandId'),
     regionId: readString(planner, 'region_id', 'regionId'),
   }
-}
+})
 
 /**
  * current_planner() may be declared to return a composite type (one object) or
