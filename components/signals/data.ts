@@ -37,6 +37,13 @@ const PAGE_SIZE = 1000;
 /** Hard stop on the pager. Twelve pairs of 104 weeks fit in two pages. */
 const MAX_PAGES = 20;
 
+// measured_lead_weeks and lead_correlation are stamped on EVERY week of a
+// series -- twelve distinct values, each repeated 104 times across 1,248 rows.
+// They are still selected because the lead table and the admission gate are
+// derived from the same read, and splitting that into a second query would
+// trade a large payload for an extra round trip on a screen whose tail is
+// already smaller than its first byte. Recorded here so the duplication is a
+// known cost rather than an unnoticed one.
 const SIGNAL_COLUMNS =
   "brand_id, category_id, iso_week, week_start, search_interest_index, social_trend_index, competitor_activity_index, competitor_price_index, trend_momentum, trend_confidence_band, measured_lead_weeks, lead_correlation";
 

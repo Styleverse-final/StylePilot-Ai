@@ -101,11 +101,34 @@ export const getSessionPlanner = cache(async function getSessionPlanner(): Promi
     return null
   }
 
-  // getUser() revalidates the JWT with the auth server. getSession() alone
-  // trusts whatever is in the cookie, which is not good enough to hang an
-  // audit trail on.
-  const { data, error } = await supabase.auth.getUser()
-  const user = data.user
+  // WHY getSession() HERE, WHEN getUser() WAS THE RULE.
+  //
+  // getUser() calls the auth server to verify the token. getSession() decodes
+  // the cookie without verifying it. On its own that would be a bad trade for
+  // a value an audit trail hangs off -- which is exactly why this used to be
+  // getUser(). Two things make it redundant on this path, and both have to
+  // stay true:
+  //
+  //   1. proxy.ts already called getUser() on THIS request, moments earlier,
+  //      and redirected to /login if it failed. The token has been verified
+  //      against the auth server before any page code runs. This is why the
+  //      proxy must remain on every matched route -- it is the verification
+  //      point, not merely a session refresher.
+  //
+  //   2. The identity that is actually ACTED on does not come from here. It
+  //      comes from current_planner(), executed by PostgREST, which verifies
+  //      the JWT signature before auth.uid() resolves. A forged cookie gets no
+  //      row back and this function returns null -- it fails closed, which is
+  //      the same behaviour as a rejected getUser().
+  //
+  // The only field that would come from an unverified decode is `email`, used
+  // as a display fallback for the name on the user chip. Nothing reads userId
+  // or email for a decision; accountable_planner and planner_id are taken from
+  // the RPC row below.
+  //
+  // Saves one network round trip on every page in the app.
+  const { data, error } = await supabase.auth.getSession()
+  const user = data.session?.user ?? null
   if (error || !user) {
     return null
   }
