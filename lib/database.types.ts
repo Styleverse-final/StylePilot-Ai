@@ -1518,6 +1518,17 @@ export type Database = {
         Args: { p_brand: string; p_category: string; p_region: string }
         Returns: boolean
       }
+      markdown_concentration: {
+        Args: { p_since: string }
+        Returns: {
+          brand_id: string
+          category_id: string
+          loss_inr: number
+          region_id: string
+          revenue_inr: number
+          units: number
+        }[]
+      }
       modules_for: {
         Args: { p_segment: string; p_tier: string }
         Returns: {
