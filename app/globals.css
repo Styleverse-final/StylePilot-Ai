@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens, mirrored from tailwind.config.ts so raw CSS and inline
+   style values can reach them. Tailwind classes remain the primary API. */
+:root {
+  color-scheme: light;
+
+  --cream: #F4F1EE;
+  --white: #FFFFFF;
+  --shell: #FBF7F3;
+  --ink: #231F1C;
+  --ink2: #3A342F;
+  --body: #5C554E;
+  --mute: #8D857D;
+  --orange: #D04A02;
+  --orangeD: #A33A00;
+  --peach: #FBE3D4;
+  --blush: #F6D3D9;
+  --rule: #F0EBE5;
+  --rule2: #E5DED7;
+  --hover: #EDE7E1;
+  --green: #2FA45B;
+  --greenW: #DFF3E3;
+  --amber: #9A6B08;
+  --amberW: #FBF0D2;
+  --red: #C0392B;
+  --redW: #F9DEDA;
+  --violet: #5B4B8A;
+  --violetW: #EDE9F5;
+}
+
+@layer base {
+  html {
+    height: 100%;
+  }
+
+  body {
+    min-height: 100%;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Numeric cells: keep digits on a fixed grid. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}

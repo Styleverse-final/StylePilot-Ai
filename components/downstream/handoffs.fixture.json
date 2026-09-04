@@ -1,0 +1,303 @@
+[
+ {
+  "id": 603,
+  "function": "DESIGN",
+  "brand_id": "SPD",
+  "insight": "Fabric sell-through over the last 26 weeks ranked Recycled polyester top at 72.2% and Tencel lyocell bottom at 45.5%, an observed 1.59x spread across 10 levels and 131 styles.",
+  "supporting_metric": "dim=fabric; best=Recycled polyester:0.722; worst=Tencel lyocell:0.455; spread_ratio=1.586; levels=10; n_styles=131; weeks=26"
+ },
+ {
+  "id": 604,
+  "function": "DESIGN",
+  "brand_id": "SPD",
+  "insight": "Fabric markdown share ranked highest on Viscose at 34.9% of units sold and lowest on Denim at 3.2% over the same 26 weeks, an observed 10.9x spread; those two recorded 49.6% and 62.2% sell-through.",
+  "supporting_metric": "dim=fabric; highest_markdown=Viscose:0.349; lowest_markdown=Denim:0.032; spread_ratio=10.920; units=5273081; weeks=26"
+ },
+ {
+  "id": 605,
+  "function": "DESIGN",
+  "brand_id": "SPD",
+  "insight": "Silhouette sell-through over the last 26 weeks ranked Boxy top at 71.2% and Straight bottom at 43.0%, an observed 1.66x spread across 7 levels and 131 styles.",
+  "supporting_metric": "dim=silhouette; best=Boxy:0.712; worst=Straight:0.430; spread_ratio=1.655; levels=7; n_styles=131; weeks=26"
+ },
+ {
+  "id": 606,
+  "function": "DESIGN",
+  "brand_id": "SPD",
+  "insight": "Silhouette markdown share ranked highest on Boxy at 43.4% of units sold and lowest on Fitted at 12.4% over the same 26 weeks, an observed 3.5x spread; those two recorded 71.2% and 55.8% sell-through.",
+  "supporting_metric": "dim=silhouette; highest_markdown=Boxy:0.434; lowest_markdown=Fitted:0.124; spread_ratio=3.509; units=5273081; weeks=26"
+ },
+ {
+  "id": 607,
+  "function": "DESIGN",
+  "brand_id": "SPD",
+  "insight": "Colour family sell-through over the last 26 weeks ranked Indigo top at 69.6% and Slate bottom at 40.9%, an observed 1.70x spread across 10 levels and 131 styles.",
+  "supporting_metric": "dim=colour_family; best=Indigo:0.696; worst=Slate:0.409; spread_ratio=1.701; levels=10; n_styles=131; weeks=26"
+ },
+ {
+  "id": 608,
+  "function": "DESIGN",
+  "brand_id": "SPD",
+  "insight": "Colour family markdown share ranked highest on Indigo at 41.1% of units sold and lowest on Rust at 5.9% over the same 26 weeks, an observed 7.0x spread; those two recorded 69.6% and 59.4% sell-through.",
+  "supporting_metric": "dim=colour_family; highest_markdown=Indigo:0.411; lowest_markdown=Rust:0.059; spread_ratio=6.950; units=5273081; weeks=26"
+ },
+ {
+  "id": 609,
+  "function": "MARKETING",
+  "brand_id": "SPD",
+  "insight": "OUTW recorded a measured 4-week signal lead: deseasonalised search interest correlates +0.84 with demand 4 weeks later, so a campaign briefed 4 weeks out sits inside the observed window.",
+  "supporting_metric": "category=OUTW; lead_weeks=4; corr=+0.8359; min_actionable_corr=0.3; signal=search_interest_index"
+ },
+ {
+  "id": 610,
+  "function": "MARKETING",
+  "brand_id": "SPD",
+  "insight": "BOTT recorded a measured 2-week signal lead: deseasonalised search interest correlates +0.76 with demand 2 weeks later, so a campaign briefed 2 weeks out sits inside the observed window.",
+  "supporting_metric": "category=BOTT; lead_weeks=2; corr=+0.7620; min_actionable_corr=0.3; signal=search_interest_index"
+ },
+ {
+  "id": 611,
+  "function": "MARKETING",
+  "brand_id": "SPD",
+  "insight": "ACCS and TOPS correlate with search interest at +0.73 and +0.67 but at a measured lead of 0 weeks, so the signal moves with demand rather than ahead of it and offers no forward campaign window.",
+  "supporting_metric": "ACCS=lead0:corr+0.7260; TOPS=lead0:corr+0.6725; min_actionable_corr=0.3"
+ },
+ {
+  "id": 612,
+  "function": "MARKETING",
+  "brand_id": "SPD",
+  "insight": "DRES (+0.26 at 3wk) sits under the 0.30 correlation threshold, so that measured lead is too weak to act on and no campaign window is claimed for it.",
+  "supporting_metric": "DRES=lead3:corr+0.2615; min_actionable_corr=0.3"
+ },
+ {
+  "id": 613,
+  "function": "MARKETING",
+  "brand_id": "SPD",
+  "insight": "TOPS ran at 89.3% availability over the last 13 weeks while demand grew 3.3% against the prior 13; roughly 91,666 units of demand went unserved.",
+  "supporting_metric": "category=TOPS; availability=0.8933; floor=0.95; demand_growth=1.0331; unserved_units=91666; weeks=13"
+ },
+ {
+  "id": 614,
+  "function": "MARKETING",
+  "brand_id": "SPD",
+  "insight": "ACCS ran at 62.8% availability over the last 13 weeks while demand grew 10.2% against the prior 13; roughly 73,142 units of demand went unserved.",
+  "supporting_metric": "category=ACCS; availability=0.6278; floor=0.95; demand_growth=1.1024; unserved_units=73142; weeks=13"
+ },
+ {
+  "id": 615,
+  "function": "RETAIL_OPS",
+  "brand_id": "SPD",
+  "insight": "No store projects below the 5-week cover floor inside the 12-week horizon at current net drawdown; the earliest is ST-SPD-024 in IN-N at week 18, holding 9.9 weeks against a 1,768-unit weekly rate.",
+  "supporting_metric": "floor_weeks=5; stores_below=0; stores=66; earliest=ST-SPD-024:17.7wk; cover=9.89wk; rate_units_wk=1768"
+ },
+ {
+  "id": 616,
+  "function": "RETAIL_OPS",
+  "brand_id": "SPD",
+  "insight": "ST-SPD-061 holds 9.9 weeks of cover against the EU median of 11.1 while ST-SPD-058 holds 13.3; 2,127 units moved from ST-SPD-058 to ST-SPD-061 levels both toward that median.",
+  "supporting_metric": "region=EU; to=ST-SPD-061:9.92wk; from=ST-SPD-058:13.35wk; median=11.07wk; movable_units=2127; to_rate_units_wk=1846"
+ },
+ {
+  "id": 617,
+  "function": "RETAIL_OPS",
+  "brand_id": "SPD",
+  "insight": "ST-SPD-051 holds 10.1 weeks of cover against the IN-E median of 11.4 while ST-SPD-052 holds 12.3; 1,978 units moved from ST-SPD-052 to ST-SPD-051 levels both toward that median.",
+  "supporting_metric": "region=IN-E; to=ST-SPD-051:10.09wk; from=ST-SPD-052:12.34wk; median=11.36wk; movable_units=1978; to_rate_units_wk=1884"
+ },
+ {
+  "id": 618,
+  "function": "RETAIL_OPS",
+  "brand_id": "SPD",
+  "insight": "ST-SPD-035 holds 10.3 weeks of cover against the IN-S median of 11.0 while ST-SPD-033 holds 11.8; 1,143 units moved from ST-SPD-033 to ST-SPD-035 levels both toward that median.",
+  "supporting_metric": "region=IN-S; to=ST-SPD-035:10.31wk; from=ST-SPD-033:11.78wk; median=10.97wk; movable_units=1143; to_rate_units_wk=2287"
+ },
+ {
+  "id": 619,
+  "function": "RETAIL_OPS",
+  "brand_id": "SPD",
+  "insight": "Cover spread ranked widest in EU: ST-SPD-058 at 13.3 weeks against ST-SPD-061 at 9.9 over 9 stores, a 1.35x range; the brand's 66 stores span 9.9 to 13.3 weeks.",
+  "supporting_metric": "region=EU; max=ST-SPD-058:13.35wk; min=ST-SPD-061:9.92wk; ratio=1.345; stores=9"
+ },
+ {
+  "id": 620,
+  "function": "MANUFACTURING",
+  "brand_id": "SPD",
+  "insight": "The recommended 12-week buy of 3,136,811 units runs 255,627 units (8.9%) above the manual plan of 2,881,184 over 2026-W24 to 2026-W35.",
+  "supporting_metric": "requirement_units=3136811; manual_units=2881184; delta_units=255627; delta_pct=0.0887; basis=buy_totals; window=2026-W36 to 2026-W47; comparison=recommended buy against the manual plan"
+ },
+ {
+  "id": 621,
+  "function": "MANUFACTURING",
+  "brand_id": "SPD",
+  "insight": "MARKETPLACE carries a 4-week lead time on 18% of the requirement, so 191,115 of its 573,345 units over 12 weeks fall inside that window and need committing before the horizon opens.",
+  "supporting_metric": "channel=MARKETPLACE; lead_time_weeks=4; demand_share=0.1828; horizon_units=573345; pull_forward_units=191115; horizon_weeks=12"
+ },
+ {
+  "id": 622,
+  "function": "MANUFACTURING",
+  "brand_id": "SPD",
+  "insight": "RETAIL carries a 3-week lead time on 60% of the requirement, so 467,947 of its 1,871,789 units over 12 weeks fall inside that window and need committing before the horizon opens.",
+  "supporting_metric": "channel=RETAIL; lead_time_weeks=3; demand_share=0.5967; horizon_units=1871789; pull_forward_units=467947; horizon_weeks=12"
+ },
+ {
+  "id": 623,
+  "function": "MANUFACTURING",
+  "brand_id": "SPD",
+  "insight": "D2C carries a 2-week lead time on 22% of the requirement, so 115,280 of its 691,677 units over 12 weeks fall inside that window and need committing before the horizon opens.",
+  "supporting_metric": "channel=D2C; lead_time_weeks=2; demand_share=0.2205; horizon_units=691677; pull_forward_units=115280; horizon_weeks=12"
+ },
+ {
+  "id": 624,
+  "function": "MANUFACTURING",
+  "brand_id": "SPD",
+  "insight": "TOPS recorded the largest plan gap of the 6 categories: 795,284 units of demand against a manual plan of 720,371 over 2026-W24 to 2026-W35, leaving the plan 10.4% short of the units the category recorded.",
+  "supporting_metric": "category=TOPS; demand_units=795284; manual_units=720371; delta_units=74914; delta_pct=0.1040; window=2026-W24 to 2026-W35"
+ },
+ {
+  "id": 625,
+  "function": "DESIGN",
+  "brand_id": "ECO",
+  "insight": "Fabric sell-through over the last 26 weeks ranked Linen blend top at 71.1% and Hemp blend bottom at 35.7%, an observed 1.99x spread across 9 levels and 94 styles.",
+  "supporting_metric": "dim=fabric; best=Linen blend:0.711; worst=Hemp blend:0.357; spread_ratio=1.993; levels=9; n_styles=94; weeks=26"
+ },
+ {
+  "id": 626,
+  "function": "DESIGN",
+  "brand_id": "ECO",
+  "insight": "Fabric markdown share ranked highest on Viscose at 52.8% of units sold and lowest on Recycled polyester at 4.0% over the same 26 weeks, an observed 13.1x spread; those two recorded 67.5% and 51.0% sell-through.",
+  "supporting_metric": "dim=fabric; highest_markdown=Viscose:0.528; lowest_markdown=Recycled polyester:0.040; spread_ratio=13.083; units=1161706; weeks=26"
+ },
+ {
+  "id": 627,
+  "function": "DESIGN",
+  "brand_id": "ECO",
+  "insight": "Silhouette sell-through over the last 26 weeks ranked Straight top at 68.6% and Wide-leg bottom at 39.4%, an observed 1.74x spread across 7 levels and 94 styles.",
+  "supporting_metric": "dim=silhouette; best=Straight:0.686; worst=Wide-leg:0.394; spread_ratio=1.741; levels=7; n_styles=94; weeks=26"
+ },
+ {
+  "id": 628,
+  "function": "DESIGN",
+  "brand_id": "ECO",
+  "insight": "Silhouette markdown share ranked highest on Straight at 51.3% of units sold and lowest on Wide-leg at 11.1% over the same 26 weeks, an observed 4.6x spread; those two recorded 68.6% and 39.4% sell-through.",
+  "supporting_metric": "dim=silhouette; highest_markdown=Straight:0.513; lowest_markdown=Wide-leg:0.111; spread_ratio=4.626; units=1271065; weeks=26"
+ },
+ {
+  "id": 629,
+  "function": "DESIGN",
+  "brand_id": "ECO",
+  "insight": "Colour family sell-through over the last 26 weeks ranked Terracotta top at 68.4% and Navy bottom at 35.3%, an observed 1.94x spread across 9 levels and 94 styles.",
+  "supporting_metric": "dim=colour_family; best=Terracotta:0.684; worst=Navy:0.353; spread_ratio=1.937; levels=9; n_styles=94; weeks=26"
+ },
+ {
+  "id": 630,
+  "function": "DESIGN",
+  "brand_id": "ECO",
+  "insight": "Colour family markdown share ranked highest on Olive at 43.0% of units sold and lowest on Sage at 13.6% over the same 26 weeks, an observed 3.2x spread; those two recorded 64.9% and 52.2% sell-through.",
+  "supporting_metric": "dim=colour_family; highest_markdown=Olive:0.430; lowest_markdown=Sage:0.136; spread_ratio=3.170; units=1246847; weeks=26"
+ },
+ {
+  "id": 631,
+  "function": "MARKETING",
+  "brand_id": "ECO",
+  "insight": "OUTW recorded a measured 4-week signal lead: deseasonalised search interest correlates +0.68 with demand 4 weeks later, so a campaign briefed 4 weeks out sits inside the observed window.",
+  "supporting_metric": "category=OUTW; lead_weeks=4; corr=+0.6840; min_actionable_corr=0.3; signal=search_interest_index"
+ },
+ {
+  "id": 632,
+  "function": "MARKETING",
+  "brand_id": "ECO",
+  "insight": "ACTV recorded a measured 2-week signal lead: deseasonalised search interest correlates +0.59 with demand 2 weeks later, so a campaign briefed 2 weeks out sits inside the observed window.",
+  "supporting_metric": "category=ACTV; lead_weeks=2; corr=+0.5857; min_actionable_corr=0.3; signal=search_interest_index"
+ },
+ {
+  "id": 633,
+  "function": "MARKETING",
+  "brand_id": "ECO",
+  "insight": "ACCS (+0.19 at 3wk), BOTT (+0.06 at 2wk), DRES (+0.19 at 0wk) and TOPS (+0.06 at 0wk) sit under the 0.30 correlation threshold, so those measured leads are too weak to act on and no campaign window is claimed for them.",
+  "supporting_metric": "ACCS=lead3:corr+0.1949; BOTT=lead2:corr+0.0641; DRES=lead0:corr+0.1872; TOPS=lead0:corr+0.0559; min_actionable_corr=0.3"
+ },
+ {
+  "id": 634,
+  "function": "MARKETING",
+  "brand_id": "ECO",
+  "insight": "TOPS ran at 93.4% availability over the last 13 weeks while demand grew 2.8% against the prior 13; roughly 12,968 units of demand went unserved.",
+  "supporting_metric": "category=TOPS; availability=0.9342; floor=0.95; demand_growth=1.0279; unserved_units=12968; weeks=13"
+ },
+ {
+  "id": 635,
+  "function": "MARKETING",
+  "brand_id": "ECO",
+  "insight": "BOTT ran at 94.8% availability over the last 13 weeks while demand grew 4.2% against the prior 13; roughly 7,446 units of demand went unserved.",
+  "supporting_metric": "category=BOTT; availability=0.9480; floor=0.95; demand_growth=1.0417; unserved_units=7446; weeks=13"
+ },
+ {
+  "id": 636,
+  "function": "RETAIL_OPS",
+  "brand_id": "ECO",
+  "insight": "No store projects below the 5-week cover floor inside the 12-week horizon; on the last 4 weeks of sales against receipts none reaches it within a year. Lowest cover recorded is 16.4 weeks at ST-ECO-005 in IN-W.",
+  "supporting_metric": "floor_weeks=5; stores_below=0; stores=32; min_cover=ST-ECO-005:16.42wk; median_cover=19.71wk; earliest_crossing_gt_weeks=52"
+ },
+ {
+  "id": 637,
+  "function": "RETAIL_OPS",
+  "brand_id": "ECO",
+  "insight": "ST-ECO-016 holds 18.7 weeks of cover against the IN-S median of 19.9 while ST-ECO-014 holds 22.8; 1,403 units moved from ST-ECO-014 to ST-ECO-016 levels both toward that median.",
+  "supporting_metric": "region=IN-S; to=ST-ECO-016:18.72wk; from=ST-ECO-014:22.81wk; median=19.91wk; movable_units=1403; to_rate_units_wk=1181"
+ },
+ {
+  "id": 638,
+  "function": "RETAIL_OPS",
+  "brand_id": "ECO",
+  "insight": "ST-ECO-005 holds 16.4 weeks of cover against the IN-W median of 19.0 while ST-ECO-001 holds 20.1; 879 units moved from ST-ECO-001 to ST-ECO-005 levels both toward that median.",
+  "supporting_metric": "region=IN-W; to=ST-ECO-005:16.42wk; from=ST-ECO-001:20.13wk; median=18.98wk; movable_units=879; to_rate_units_wk=961"
+ },
+ {
+  "id": 639,
+  "function": "RETAIL_OPS",
+  "brand_id": "ECO",
+  "insight": "ST-ECO-023 holds 17.3 weeks of cover against the IN-E median of 18.4 while ST-ECO-021 holds 20.6; 830 units moved from ST-ECO-021 to ST-ECO-023 levels both toward that median.",
+  "supporting_metric": "region=IN-E; to=ST-ECO-023:17.35wk; from=ST-ECO-021:20.56wk; median=18.41wk; movable_units=830; to_rate_units_wk=782"
+ },
+ {
+  "id": 640,
+  "function": "RETAIL_OPS",
+  "brand_id": "ECO",
+  "insight": "Cover spread ranked widest in IN-W: ST-ECO-001 at 20.1 weeks against ST-ECO-005 at 16.4 over 7 stores, a 1.23x range; the brand's 32 stores span 16.4 to 22.8 weeks.",
+  "supporting_metric": "region=IN-W; max=ST-ECO-001:20.13wk; min=ST-ECO-005:16.42wk; ratio=1.226; stores=7"
+ },
+ {
+  "id": 641,
+  "function": "MANUFACTURING",
+  "brand_id": "ECO",
+  "insight": "The recommended 12-week buy of 692,048 units runs 57,028 units (7.6%) below the manual plan of 749,076 over 2026-W24 to 2026-W35.",
+  "supporting_metric": "requirement_units=692048; manual_units=749076; delta_units=-57028; delta_pct=-0.0761; basis=buy_totals; window=2026-W36 to 2026-W47; comparison=recommended buy against the manual plan"
+ },
+ {
+  "id": 642,
+  "function": "MANUFACTURING",
+  "brand_id": "ECO",
+  "insight": "MARKETPLACE carries a 4-week lead time on 15% of the requirement, so 34,825 of its 104,475 units over 12 weeks fall inside that window and need committing before the horizon opens.",
+  "supporting_metric": "channel=MARKETPLACE; lead_time_weeks=4; demand_share=0.1510; horizon_units=104475; pull_forward_units=34825; horizon_weeks=12"
+ },
+ {
+  "id": 643,
+  "function": "MANUFACTURING",
+  "brand_id": "ECO",
+  "insight": "RETAIL carries a 3-week lead time on 55% of the requirement, so 94,331 of its 377,326 units over 12 weeks fall inside that window and need committing before the horizon opens.",
+  "supporting_metric": "channel=RETAIL; lead_time_weeks=3; demand_share=0.5452; horizon_units=377326; pull_forward_units=94331; horizon_weeks=12"
+ },
+ {
+  "id": 644,
+  "function": "MANUFACTURING",
+  "brand_id": "ECO",
+  "insight": "D2C carries a 2-week lead time on 30% of the requirement, so 35,041 of its 210,247 units over 12 weeks fall inside that window and need committing before the horizon opens.",
+  "supporting_metric": "channel=D2C; lead_time_weeks=2; demand_share=0.3038; horizon_units=210247; pull_forward_units=35041; horizon_weeks=12"
+ },
+ {
+  "id": 645,
+  "function": "MANUFACTURING",
+  "brand_id": "ECO",
+  "insight": "DRES recorded the largest plan gap of the 6 categories: 103,440 units of demand against a manual plan of 117,916 over 2026-W24 to 2026-W35, leaving the plan 12.3% over the units the category recorded.",
+  "supporting_metric": "category=DRES; demand_units=103440; manual_units=117916; delta_units=-14476; delta_pct=-0.1228; window=2026-W24 to 2026-W35"
+ }
+]
