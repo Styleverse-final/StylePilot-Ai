@@ -21,14 +21,15 @@ export type UserChipProps = {
   /** Job title, shown under the name in the menu. */
   role?: string;
   /**
-   * Sign-out handler. Rendered as a `<form action>`, so a Next server
-   * action can be passed straight through from a server component.
-   */
-  onSignOut?: () => void | Promise<void>;
-  /**
-   * Endpoint used when no handler is supplied. POSTed, never linked: a GET
-   * sign-out can be fired by any third-party page with an <img> tag, and
-   * browsers pre-fetch links.
+   * Where the sign-out form POSTs. POSTed, never linked: a GET sign-out can
+   * be fired by any third-party page with an <img> tag, and browsers
+   * pre-fetch links.
+   *
+   * There is deliberately no handler prop beside this. There was one, and
+   * because the layout supplied it this endpoint was never exercised -- the
+   * handler redirected here instead, the browser followed with GET, and the
+   * POST-only route answered 405 for every sign-out in production. One path
+   * cannot fall out of use behind another.
    */
   signOutEndpoint?: string;
 };
@@ -49,7 +50,6 @@ const AVATAR_CLASS =
 export function UserChip({
   name,
   role,
-  onSignOut,
   signOutEndpoint = "/auth/signout",
 }: UserChipProps) {
   const displayName = name?.trim() ? name.trim() : FALLBACK_NAME;
@@ -101,11 +101,12 @@ export function UserChip({
           <div className="mb-[10px] text-small font-semibold text-mute">
             {role ?? "Signed in"}
           </div>
-          <form
-            {...(onSignOut
-              ? { action: onSignOut }
-              : { action: signOutEndpoint, method: "post" })}
-          >
+          {/* A real form POST, not a link and not a redirect into the route.
+              Sign-out ends a session, so it must not be reachable by GET: a
+              prefetch, a link preview or a crawler would sign the planner
+              out. The handler answers 303, which the browser follows with GET
+              to /login. */}
+          <form action={signOutEndpoint} method="post">
             <button type="submit" role="menuitem" className={signOutClass}>
               Sign out
             </button>

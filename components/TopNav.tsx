@@ -58,7 +58,6 @@ const PIP_BASE =
 const PIP_HREF = "/exceptions";
 const CHEVRON = String.fromCharCode(0x25be); // black down-pointing small triangle
 
-
 export type NavUser = {
   name?: string;
   role?: string;
@@ -69,8 +68,6 @@ export type TopNavProps = {
   exceptionCount?: number;
   /** Signed-in user. Supplied by whoever wires the session. */
   user?: NavUser | null;
-  /** Server action or client handler behind the UserChip sign-out control. */
-  onSignOut?: () => void | Promise<void>;
 };
 
 function isActive(pathname: string, href: string): boolean {
@@ -78,7 +75,7 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function TopNav({ exceptionCount, user, onSignOut }: TopNavProps) {
+export function TopNav({ exceptionCount, user }: TopNavProps) {
   const { primary, secondary, more } = navFor(user?.role);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -217,7 +214,7 @@ export function TopNav({ exceptionCount, user, onSignOut }: TopNavProps) {
         >
           {SPARK}
         </button>
-        <UserChip name={user?.name} role={user?.role} onSignOut={onSignOut} />
+        <UserChip name={user?.name} role={user?.role} />
       </div>
     </header>
   );

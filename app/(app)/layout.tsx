@@ -54,11 +54,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   ]);
   if (!planner) redirect("/login");
 
-  async function signOut() {
-    "use server";
-    redirect("/auth/signout");
-  }
-
+  // NO SIGN-OUT SERVER ACTION HERE, DELIBERATELY.
+  //
+  // There used to be one, and all it did was redirect("/auth/signout"). A
+  // redirect is followed by the browser with GET, and that route is POST only,
+  // so every sign-out in production answered 405. UserChip already posts a
+  // real form to the route; that is the only path now, so there is no second
+  // one to go stale.
   return (
     <CopilotProvider>
       <div className="mx-auto min-w-[1140px] max-w-[1400px] px-[20px] pb-[44px] pt-[16px] max-[1140px]:min-w-0">
@@ -68,7 +70,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             name: planner.fullName ?? planner.email ?? undefined,
             role: planner.appRole ?? undefined,
           }}
-          onSignOut={signOut}
         />
         {children}
       </div>
