@@ -1,57 +1,38 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { Banner, Card, CardBody, PageHeader } from "@/components";
+import { Banner, PageHeader, Why } from "@/components";
 import type { KpiItem } from "@/components";
-import {
-  AccuracyByBrand,
-  IntervalQuality,
-  NoCategoryAccuracy,
-  type BrandAccuracy,
-} from "@/components/portfolio/AccuracyByBrand";
 import { AdoptionPanel } from "@/components/portfolio/Adoption";
 import { BrandSwitcher } from "@/components/portfolio/BrandSwitcher";
-import { CycleStages } from "@/components/portfolio/CycleStages";
 import {
   adoptionFindings,
-  benchmarkRows,
-  categoryEvidence,
   readAdoption,
   readBrands,
-  readCountsByType,
-  readCoverage,
-  readHorizon,
   readLabels,
-  readMarkdown,
-  readRegistry,
-  readStageBands,
   readUndecided,
   readValue,
   resolveScope,
   type Labels,
 } from "@/components/portfolio/data";
 import {
-  DASH,
   formatCount,
   formatCrore,
   formatSignedCrore,
   formatSignedPct,
   joinWords,
 } from "@/components/portfolio/format";
-import { Explain, SectionHeading } from "@/components/portfolio/Layout";
+import { Explain } from "@/components/portfolio/Layout";
 import { MarginBridge } from "@/components/portfolio/MarginBridge";
-import { MarkdownConcentration } from "@/components/portfolio/MarkdownConcentration";
 import { UndecidedPanel } from "@/components/portfolio/Undecided";
 import { UnitsAndHolding } from "@/components/portfolio/UnitsAndHolding";
 import type {
   AdoptionRow,
-  CoverageRow,
-  MarkdownView,
   PortfolioScope,
   UndecidedView,
   ValueView,
 } from "@/components/portfolio/types";
-import { getAccuracyHeadline, type AccuracyHeadline } from "@/lib/accuracy";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
 
@@ -173,21 +154,6 @@ function headerKpis(
 }
 
 /** The accuracy cards, one per brand in scope, assembled from the registry. */
-function brandAccuracies(
-  headlines: readonly AccuracyHeadline[],
-  scope: PortfolioScope,
-  labels: Labels,
-): BrandAccuracy[] {
-  return headlines
-    .filter((headline) => scope.brandIds.includes(headline.brandId))
-    .map((headline) => ({
-      brandId: headline.brandId,
-      label: labels.brand[headline.brandId] ?? headline.brandId,
-      accuracy: headline,
-      benchmarks: benchmarkRows(headline),
-    }));
-}
-
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -201,16 +167,6 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
   if (!PORTFOLIO_ROLES.includes(planner.appRole ?? "")) redirect("/");
 
   const sb = await createServerAnonClient();
-
-  // STARTED HERE, AWAITED AT THE END.
-  //
-  // readStageBands reads autonomy_band, which carries no brand filter and so
-  // depends on nothing above it. It used to sit in a Promise.all AFTER the
-  // scope reads, which meant a round trip that could have overlapped them was
-  // instead queued behind them. Kicking it off now costs nothing and takes it
-  // off the critical path entirely. The .catch() is attached at creation, so
-  // a rejection is handled even though the await is much later.
-  const stageBandsPromise = readStageBands(sb).catch(() => []);
 
   // Scope first: nothing else can be read until we know which brands row
   // level security returned, and the switcher is built from that set.
@@ -238,21 +194,6 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
 
   let value: ValueView | null = null;
   let valueError: string | null = null;
-  let accuracies: BrandAccuracy[] = [];
-  let coverage: CoverageRow[] = [];
-  let accuracyFolds: number | null = null;
-  let categoryProof = { categoryKeys: [] as string[], registryRows: 0 };
-  let horizon = {
-    horizonWeeks: null as number | null,
-    forecastFirstWeek: null as string | null,
-    forecastLastWeek: null as string | null,
-    factLastWeek: null as string | null,
-    overlapRows: null as number | null,
-    noOverlap: false,
-  };
-  let accuracyError: string | null = null;
-  let markdown: MarkdownView | null = null;
-  let markdownError: string | null = null;
   let adoption: AdoptionRow[] = [];
   let adoptionError: string | null = null;
   let undecided: UndecidedView | null = null;
@@ -263,70 +204,24 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
   // below filters on that brand list, so running them would send an empty
   // IN clause to PostgREST for no benefit. They are skipped, and the screen
   // says why rather than rendering five panels of dashes.
-  // The cycle panel's other input. It needs the resolved scope, so it cannot
-  // start earlier than this -- but nothing in the five blocks below needs IT,
-  // so awaiting it here would have stalled them behind a round trip they do
-  // not depend on. Started now, awaited after they finish.
-  //
-  // Both cycle-panel inputs fail soft: with no bands readable the classifier
-  // cannot promote any stage to AUTOMATED, which is the safe direction -- it
-  // under-claims automation rather than over-claiming it.
-  const countsPromise = readCountsByType(sb, scope.brandIds).catch(() => ({}));
-
   const hasScope = !scopeError && scope.brandIds.length > 0;
 
   if (hasScope) {
-    // Two blocks need the horizon -- the accuracy section to say there is no
-    // overlap to rescore, the markdown section to size its trailing window --
-    // so it is read ONCE and awaited in both. Sharing the promise rather than
-    // the result keeps the two blocks independent: if the read fails, each
-    // fails on its own and reports it in its own panel.
-    const horizonRead = readHorizon(sb);
-
-    // Every block is independent. One failing costs its own panel and
-    // nothing else; a single try around all of them meant one slow join
-    // taking the whole screen down with it.
-    const [valueResult, accuracyResult, markdownResult, adoptionResult, openResult] =
-      await Promise.allSettled([
-        readValue(sb, scope, labels),
-        (async () => {
-          const [entries, headlines, window] = await Promise.all([
-            readRegistry(sb),
-            getAccuracyHeadline(sb),
-            horizonRead,
-          ]);
-          return {
-            entries,
-            headlines,
-            window,
-            coverage: await readCoverage(sb, scope, entries),
-          };
-        })(),
-        (async () => readMarkdown(sb, scope, labels, await horizonRead))(),
-        readAdoption(sb, scope, labels),
-        readUndecided(sb, scope, labels),
-      ]);
+    // FOUR PANELS, FOUR READS. The registry, the interval coverage, the
+    // forecast horizon and the markdown concentration are no longer read here
+    // because they are no longer rendered here. A page that fetches what it
+    // does not render is the over-fetching problem from the performance pass.
+    //
+    // Every block is independent: one failing costs its own panel and nothing
+    // else.
+    const [valueResult, adoptionResult, openResult] = await Promise.allSettled([
+      readValue(sb, scope, labels),
+      readAdoption(sb, scope, labels),
+      readUndecided(sb, scope, labels),
+    ]);
 
     if (valueResult.status === "fulfilled") value = valueResult.value;
     else valueError = message(valueResult.reason);
-
-    if (accuracyResult.status === "fulfilled") {
-      const { entries, headlines, window, coverage: rows } = accuracyResult.value;
-      accuracies = brandAccuracies(headlines, scope, labels);
-      coverage = rows;
-      horizon = window;
-      categoryProof = categoryEvidence(entries);
-      // The fold count travels with the headline and nowhere else. Where two
-      // brands disagree, no count is claimed rather than one being picked.
-      const counts = new Set(accuracies.map((entry) => entry.accuracy.foldCount));
-      accuracyFolds =
-        counts.size === 1 ? (accuracies[0]?.accuracy.foldCount ?? null) : null;
-    } else {
-      accuracyError = message(accuracyResult.reason);
-    }
-
-    if (markdownResult.status === "fulfilled") markdown = markdownResult.value;
-    else markdownError = message(markdownResult.reason);
 
     if (adoptionResult.status === "fulfilled") adoption = adoptionResult.value;
     else adoptionError = message(adoptionResult.reason);
@@ -334,13 +229,6 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
     if (openResult.status === "fulfilled") undecided = openResult.value;
     else undecidedError = message(openResult.reason);
   }
-
-  // Both cycle-panel reads were started earlier and overlapped everything
-  // above; this is where their results are finally needed.
-  const [stageBands, countsByType] = await Promise.all([
-    stageBandsPromise,
-    countsPromise,
-  ]);
 
   const findings = adoptionFindings(adoption);
 
@@ -400,212 +288,86 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
 
       {!hasScope ? null : (
         <>
-        <Banner
-          variant="violet"
-          icon="i"
-          title="This screen has no decisions on it, and that is the point"
-          measureCh={100}
-        >
-          A planner&apos;s screens are a queue: rows to approve, modify or
-          reject, each one logged against their name. This one is the
-          consequences of that queue. Nothing here can be committed, nothing is
-          overdue, and where a figure describes work somebody has not done, the
-          panel says whose act it would be rather than offering you a button to
-          do it for them. Every number is read from Postgres at request time
-          under your own session
-          {brandLabels.length > 1 ? `, across ${joinWords(brandLabels)}` : ""}.
-        </Banner>
-
-        <SectionHeading
-          eyebrow="What the pilot protected"
-          title="Margin, and what it cost to hold"
-        >
-          value_summary records the CHANGE against the manual plan over the
-          forward horizon, not the level, so the bridge opens at the plan as it
-          stands rather than at a rupee figure {DASH} no
-          table in this schema holds the absolute margin of the plan being
-          changed. The two levers stay apart because they are bought with
-          different things, and the holding cost sits beside the margin at the
-          same size because the case constrains it.
-        </SectionHeading>
-
         {valueError ? (
           <Explain>
-            The value summary could not be read: {valueError}. Every other block
-            on this screen was read separately and stands on its own. Nothing has
-            been estimated to fill the gap, because a margin bridge assembled
-            without its rows would be a drawing rather than a figure.
+            The value summary could not be read: {valueError}. Nothing has been
+            estimated to fill the gap.
           </Explain>
         ) : value ? (
           <div className="flex flex-col gap-[16px]">
+            {/* 1 -- what the pilot protected, and by which lever. */}
             <MarginBridge value={value} singleBrand={scope.selected !== null} />
+            {/* 2 -- and what it cost to hold. */}
             <UnitsAndHolding value={value} />
           </div>
         ) : null}
 
-        <SectionHeading
-          eyebrow="What changed about the way the work is done"
-          title="The planning cycle, stage by stage"
-        >
-          Deliverable 1a asks which steps this removes, shortens or replaces,
-          and 1b asks what ends up automated. Both are answered here, and
-          neither is answered with a saved-weeks figure, because none has been
-          measured.
-        </SectionHeading>
+        {/* 3 -- work nobody has picked up. */}
+        <div className="mt-[16px]">
+          {undecidedError ? (
+            <Explain>
+              The exception backlog could not be read: {undecidedError}.
+            </Explain>
+          ) : undecided ? (
+            <UndecidedPanel view={undecided} />
+          ) : null}
+        </div>
 
-        <CycleStages
-          className="mb-[16px]"
-          bands={stageBands}
-          countsByType={countsByType}
-        />
+        {/* 4 -- whether planners accept what the model proposes. */}
+        <div className="mt-[16px]">
+          {adoptionError ? (
+            <Explain>Adoption could not be read: {adoptionError}.</Explain>
+          ) : (
+            <AdoptionPanel rows={adoption} findings={findings} />
+          )}
+        </div>
 
-        <SectionHeading
-          eyebrow="How good the forecast underneath it is"
-          title="Accuracy by brand, against four benchmarks"
-        >
-          One benchmark proves nothing and the flattering one proves least.
-          Seasonal naive is the comparison that counts: nobody constructed it,
-          it carries the seasonality the business actually has, and the margin
-          over it is small. The manual baseline was authored and calibrated to a
-          target, so the large margin over it describes the fixture as much as
-          the model. Both travel together, always, and the panel at the end of
-          this section explains why there is no per-category cut.
-        </SectionHeading>
+        {/*
+          WHERE THE CUT PANELS WENT.
 
-        {accuracyError ? (
-          <Explain>
-            The model registry could not be read: {accuracyError}. No accuracy
-            figure is shown rather than an approximate one, and no benchmark
-            margin is inferred from anything else on this screen.
-          </Explain>
-        ) : (
-          <div className="flex flex-col gap-[16px]">
-            <AccuracyByBrand entries={accuracies} />
-            <IntervalQuality
-              rows={coverage}
-              labels={labels.brand}
-              accuracyFolds={accuracyFolds}
-            />
-            <NoCategoryAccuracy
-              horizon={horizon}
-              evidence={categoryProof}
-              brandLabels={accuracies.map((entry) => entry.label)}
-            />
-          </div>
-        )}
+          Four panels left this screen and none was deleted. A link is the
+          honest form of "this exists, elsewhere": a CMPO who wants the cycle
+          mapping or the markdown concentration reaches it in one click, and
+          no number now lives on two screens to drift apart.
+        */}
+        <div className="mt-[20px] flex flex-wrap items-center gap-[8px]">
+          <span className="text-label font-extrabold text-mute">ALSO ON</span>
+          {[
+            { href: "/model-ops", label: "Planning cycle and model accuracy" },
+            { href: "/markdown", label: "Markdown concentration" },
+            { href: "/exceptions", label: "The exception queue" },
+            { href: "/governance", label: "The decision trail" },
+          ].map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-pill bg-cream px-[11px] py-[4px] text-copy font-bold text-ink transition-colors duration-[120ms] hover:bg-peach"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
 
-        <SectionHeading
-          eyebrow="Where the exposure sits"
-          title="Markdown concentration, by category and by region"
-        >
-          A single portfolio markdown figure is true and useless. What a CMPO
-          needs is whether the loss is spread or piled, and the only way to tell
-          is to put the rate beside the rupees: a big region always carries more
-          markdown than a small one, which is arithmetic, not a finding.
-        </SectionHeading>
-
-        {markdownError ? (
-          <Explain>
-            The markdown concentration could not be read: {markdownError}. The
-            realised-loss cut and the optimiser&apos;s recommendations come from
-            two different tables and both are missing here; neither is
-            substituted for the other.
-          </Explain>
-        ) : markdown ? (
-          <MarkdownConcentration markdown={markdown} brandLabels={brandLabels} />
-        ) : null}
-
-        <SectionHeading
-          eyebrow="Is the function using any of it"
-          title="Adoption across the recommendation types"
-        >
-          Engagement and agreement are different failures and a single adoption
-          percentage hides which one you have. They are kept apart here, and
-          where nothing has been decided the rate is rendered as an absence
-          rather than as a zero {DASH} a plan nobody has
-          opened and a plan everybody rejected are opposite problems.
-        </SectionHeading>
-
-        {adoptionError ? (
-          <Explain>
-            The adoption view could not be read: {adoptionError}. No approval
-            rate is estimated from the decision ledger directly, because the view
-            applies the same definition across brands and a hand-rolled count
-            here would quietly use a different one.
-          </Explain>
-        ) : (
-          <AdoptionPanel rows={adoption} findings={findings} />
-        )}
-
-        <SectionHeading
-          eyebrow="What nobody has done"
-          title="Exceptions above threshold with no decision logged"
-        >
-          Not what to do about them {DASH} that is a
-          planner&apos;s queue and it lives elsewhere. This is the shape of the
-          backlog: which severity band, which brand, which category, and what
-          share of each was raised and then left. The share is the finding; the
-          count on its own is not.
-        </SectionHeading>
-
-        {undecidedError ? (
-          <Explain>
-            The exception state could not be read: {undecidedError}. No partial
-            count is shown, because an undecided count without the total it came
-            out of is the one form of this figure that always misleads.
-          </Explain>
-        ) : undecided ? (
-          <UndecidedPanel view={undecided} />
-        ) : null}
-
-        <div className="mt-[26px]">
-          <Card>
-            <CardBody>
-              <div className="text-micro font-extrabold tracking-[0.06em] text-mute">
-                WHERE EVERY NUMBER ON THIS PAGE CAME FROM
-              </div>
-              <p className="mt-[6px] max-w-[100ch] text-copy leading-[1.6] text-body">
-                Every figure above is read from Postgres at request time through
-                your own session, so row level security decided the scope of all
-                of it: value_summary for the bridge, the units and the holding
-                cost; model_registry for the accuracy and the four benchmarks;
-                policy_parameter for the calibrated interval coverage;
-                fact_demand_weekly for realised markdown and
-                markdown_recommendation for the recommended exposure;
-                v_adoption_kpi for adoption; and v_recommendation_state for the
-                exception backlog. The trailing markdown window is the published
-                forecast horizon read from forecast.horizon_week rather than a
-                chosen number of weeks, and the overlap count behind the
-                per-category refusal is a live count against that same table.
-                dim_brand, dim_category and dim_region supply names only, never
-                figures. No figure on this screen is written into its code, and
-                there is no constant file behind it.
-              </p>
-              <p className="mt-[9px] max-w-[100ch] text-copy leading-[1.6] text-body">
-                Two figures genuinely have no column of their own and both are
-                handled the same way, by quotation rather than by re-typing: the
-                holding rate per unit-week and the absolute unit counts behind
-                the percentage change live only inside value_summary&apos;s
-                stored <span className="font-mono text-[11.5px]">basis</span>{" "}
-                sentence, and the fold arithmetic behind the calibrated coverage
-                lives only inside policy_parameter&apos;s. Both strings are shown
-                verbatim behind the disclosures marked &quot;the derivation
-                stored beside...&quot;, and neither is lifted out into a
-                headline or a KPI.
-              </p>
-              <p className="mt-[9px] max-w-[100ch] text-copy leading-[1.6] text-body">
-                Those two are the ones worth naming, because they carry figures
-                a reader might otherwise go looking for a column behind. This
-                paragraph used to end by calling that the complete list of
-                everything on the page without a table. It was not, and the
-                claim has been withdrawn rather than patched: an assurance that
-                every number has been accounted for is the one statement here
-                that stops you checking, so it should only be made by something
-                that can actually enumerate the page. Where a figure is
-                authored, it is labelled where it appears.
-              </p>
-            </CardBody>
-          </Card>
+        <div className="mt-[14px]">
+          <Why
+            lead={
+              <>
+                Every figure above is read from Postgres at request time under
+                your own session, so row level security decided its scope
+              </>
+            }
+            label="provenance"
+          >
+            value_summary supplies the bridge, the unit change and the holding
+            cost; v_adoption_kpi the approval rates; v_recommendation_state the
+            exception backlog. dim_brand, dim_category and dim_region supply
+            names only, never figures. Two figures have no column of their own
+            and are quoted rather than re-typed: the holding rate per unit-week
+            and the absolute unit counts behind the percentage change live
+            inside value_summary&apos;s stored basis sentence, shown verbatim
+            behind the disclosure on that panel. Where a figure is authored, it
+            is labelled where it appears.
+          </Why>
         </div>
         </>
       )}

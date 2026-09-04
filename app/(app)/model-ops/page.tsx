@@ -10,6 +10,8 @@ import {
   type KpiItem,
 } from "@/components";
 import { Architecture } from "@/components/modelops/Architecture";
+import { CycleStages, type StageBand } from "@/components/portfolio/CycleStages";
+import { readCountsByType } from "@/components/portfolio/data";
 import { CalibrationPanel } from "@/components/modelops/CalibrationPanel";
 import { ColdStartPanel } from "@/components/modelops/ColdStartPanel";
 import { DriftMonitor } from "@/components/modelops/DriftMonitor";
@@ -244,6 +246,7 @@ export default async function ModelOpsPage() {
   const brandId = planner?.brandId ?? null;
 
   const sb = await createServerAnonClient();
+  const countsByTypePromise = readCountsByType(sb, []).catch(() => ({}));
 
   let data: ModelOpsData | null = null;
   let headlines: AccuracyHeadline[] = [];
@@ -275,7 +278,40 @@ export default async function ModelOpsPage() {
     );
   }
 
+  const countsByType = await countsByTypePromise;
   const drift = buildDrift(data.runs, data.bands);
+
+  // THE PLANNING CYCLE PANEL MOVED HERE FROM /portfolio.
+  //
+  // It answers "which steps does this remove, shorten or replace", which is a
+  // question about the system rather than about the business -- so it belongs
+  // beside the architecture and the autonomy bands, not on a screen a CMPO
+  // opens to see whether the programme is working.
+  //
+  // Same source as it always used: autonomy_band, which this page already
+  // reads. A band that permits nothing (markdown_agent, 0.0/0.0) is filtered
+  // out, because an enabled flag over a zero cap is not automation.
+  const AGENT_DECIDES: Readonly<Record<string, string>> = {
+    allocation_agent: "ALLOCATION",
+    exception_agent: "EXCEPTION",
+    markdown_agent: "MARKDOWN",
+  };
+  const seenAgents = new Set<string>();
+  const stageBands: StageBand[] = [];
+  for (const band of data.bands) {
+    const recType = AGENT_DECIDES[band.agent_name];
+    if (!recType) continue;
+    const permits =
+      Number(band.max_shift_pp ?? 0) > 0 || Number(band.max_value_inr ?? 0) > 0;
+    if (!permits || seenAgents.has(band.agent_name)) continue;
+    seenAgents.add(band.agent_name);
+    stageBands.push({
+      recType,
+      agentName: band.agent_name,
+      enabled: band.enabled === true,
+      actsWithin: band.acts_within ?? "",
+    });
+  }
 
   // Built once and used twice: the summary sentence and the panels below it
   // read the same objects, so the heading cannot quote a figure the cards
@@ -343,6 +379,12 @@ export default async function ModelOpsPage() {
         registry={data.registry}
         parameters={data.parameters}
         bands={data.bands}
+      />
+
+      <CycleStages
+        className="mb-[16px]"
+        bands={stageBands}
+        countsByType={countsByType}
       />
 
       <SectionHeading eyebrow="model_registry" title="What is registered, and what it beats">

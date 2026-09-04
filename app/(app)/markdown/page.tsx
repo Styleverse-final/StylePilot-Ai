@@ -41,6 +41,15 @@ import type { CategoryFit, MarkdownRow } from "@/components/markdown/types";
 import { getAccuracyHeadline, type AccuracyHeadline } from "@/lib/accuracy";
 import { getElasticity, getMarkdownRecs } from "@/lib/queries";
 import { getSessionPlanner } from "@/lib/session";
+import { MarkdownConcentration } from "@/components/portfolio/MarkdownConcentration";
+import {
+  readBrands,
+  readHorizon,
+  readLabels,
+  readMarkdown,
+  resolveScope,
+} from "@/components/portfolio/data";
+import type { MarkdownView } from "@/components/portfolio/types";
 import { createServerAnonClient } from "@/lib/supabase";
 
 export const metadata: Metadata = {
@@ -243,6 +252,19 @@ export default async function MarkdownPage({
   let headlines: AccuracyHeadline[] = [];
   let readError: string | null = null;
 
+  // THE CONCENTRATION PANEL MOVED HERE FROM /portfolio.
+  //
+  // It answers "where does the markdown loss actually sit", which belongs
+  // beside the optimiser's recommendations rather than on a CMPO's landing
+  // page: the two read as one argument here -- this is where it went, and
+  // this is what the optimiser proposes to do about it.
+  //
+  // Its three inputs are started NOW so they overlap the reads below rather
+  // than stacking behind them. A failure costs this panel and nothing else.
+  let concentration: MarkdownView | null = null;
+  const brandsPromise = readBrands(sb).catch(() => []);
+  const horizonPromise = readHorizon(sb).catch(() => null);
+
   try {
     const [recommendations, elasticity, accuracy, categoryNames] =
       await Promise.all([
@@ -266,6 +288,20 @@ export default async function MarkdownPage({
     rows = toMarkdownRows(recommendations, fits, prices, categoryNames);
   } catch (error) {
     readError = error instanceof Error ? error.message : String(error);
+  }
+
+  try {
+    const [brands, horizon] = await Promise.all([brandsPromise, horizonPromise]);
+    if (brands.length > 0 && horizon) {
+      const scope = resolveScope(brands, brandId);
+      const labels = await readLabels(sb, brands);
+      concentration = await readMarkdown(sb, scope, labels, horizon);
+    }
+  } catch {
+    // The panel is supplementary to the optimiser table above it. If it
+    // cannot be read the screen still does its job, so this stays silent
+    // rather than raising an error over the whole page.
+    concentration = null;
   }
 
   const accuracy = accuracyForRows(headlines, rows, brandId);
@@ -475,6 +511,19 @@ export default async function MarkdownPage({
           ) : null}
         </>
       )}
+
+      {concentration ? (
+
+        <MarkdownConcentration
+
+          markdown={concentration}
+
+          brandLabels={[brandId]}
+
+        />
+
+      ) : null}
+
 
       <ModelStrip
         className="mt-[16px]"
