@@ -218,15 +218,28 @@ export default async function BuyPage() {
         title="Buy plan"
         kpis={headerKpis(rows)}
       >
-        {accuracy ? <AccuracyStatement accuracy={accuracy} /> : null}
+        {/*
+          COMPACT, NOT REMOVED. Part H still holds: the compact variant renders
+          the headline and the seasonal-naive margin on one line, together, and
+          puts the fold count, MASE and the manual comparison behind a
+          disclosure. What Part H protects is the headline never appearing
+          alone, and it still cannot.
+        */}
+        {accuracy ? (
+          <AccuracyStatement accuracy={accuracy} variant="compact" />
+        ) : null}
       </PageHeader>
 
-      <ServiceLevelBanner parameter={serviceLevel} />
-      <SafetyStockNote
-        coverage={coverage}
-        spreadFactor={spreadFactor}
-        accuracyFolds={accuracy?.foldCount ?? null}
-      />
+      {/*
+        THE TWO THRESHOLD BANNERS MOVED BELOW THE TABLE.
+
+        Neither was cut. The service level derivation and the safety-stock
+        calibration note are the reason the quantities in the table are what
+        they are, and a planner who wants to argue with a number needs them.
+        But 302 words between the header and the first row meant reading the
+        derivation before seeing anything derived. They sit under the table
+        now, in the order a planner actually needs them: the rows, then why.
+      */}
 
       {readError ? (
         <Explain>
@@ -247,6 +260,15 @@ export default async function BuyPage() {
       ) : (
         <BuyTable rows={rows} holdNote={holdNote(rows)} />
       )}
+
+      <div className="mt-[16px]">
+        <ServiceLevelBanner parameter={serviceLevel} />
+        <SafetyStockNote
+          coverage={coverage}
+          spreadFactor={spreadFactor}
+          accuracyFolds={accuracy?.foldCount ?? null}
+        />
+      </div>
 
       <ModelStrip
         className="mt-[16px]"

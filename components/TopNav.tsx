@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -30,6 +32,8 @@ import { navFor, type NavItem } from "./navItems";
 export {
   PRIMARY_NAV,
   SECONDARY_NAV,
+  MORE_NAV,
+  ALL_NAV,
   PORTFOLIO_PRIMARY_NAV,
   PORTFOLIO_ROLES,
   navFor,
@@ -52,6 +56,7 @@ const PIP_BASE =
   "ml-[5px] inline-block min-w-[16px] rounded-pill px-[4px] text-center text-[10px] font-extrabold tabular-nums";
 
 const PIP_HREF = "/exceptions";
+const CHEVRON = String.fromCharCode(0x25be); // black down-pointing small triangle
 
 
 export type NavUser = {
@@ -74,11 +79,28 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 export function TopNav({ exceptionCount, user, onSignOut }: TopNavProps) {
-  const { primary, secondary } = navFor(user?.role);
+  const { primary, secondary, more } = navFor(user?.role);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const { open } = useCopilot();
 
   if (CHROMELESS_ROUTES.includes(pathname)) return null;
+
+  const moreActive = more.some((item) => isActive(pathname, item.href));
+
+  // Close on an outside click. Without this the menu stays open behind the
+  // next thing the reader does, which reads as a stuck UI rather than a menu.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(event.target as Node)) {
+        setMoreOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [moreOpen]);
 
   const renderTab = (item: NavItem, secondary: boolean) => {
     const active = isActive(pathname, item.href);
@@ -133,6 +155,57 @@ export function TopNav({ exceptionCount, user, onSignOut }: TopNavProps) {
         {primary.map((item) => renderTab(item, false))}
         <span className="mx-[7px] h-[20px] w-px bg-rule2" aria-hidden="true" />
         {secondary.map((item) => renderTab(item, true))}
+
+        {/*
+          MORE. Evidence and governance live behind one door rather than
+          competing with Buy for the same row. The trigger lights violet when
+          a route inside it is active, so a reader on /governance can still
+          see where they are without the menu being open.
+        */}
+        <div className="relative" ref={moreRef}>
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            aria-expanded={moreOpen}
+            aria-haspopup="menu"
+            className={`${TAB_BASE} ${
+              moreActive
+                ? TAB_TONE.secondaryActive
+                : TAB_TONE.secondaryIdle
+            }`}
+          >
+            More
+            <span aria-hidden="true" className="ml-[4px] text-[9px]">
+              {CHEVRON}
+            </span>
+          </button>
+
+          {moreOpen ? (
+            <div
+              role="menu"
+              className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-[190px] rounded-card border border-rule bg-white py-[6px] shadow-drawer"
+            >
+              {more.map((item) => {
+                const active = isActive(pathname, item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    role="menuitem"
+                    onClick={() => setMoreOpen(false)}
+                    className={`block px-[14px] py-[8px] text-nav transition-colors duration-[120ms] ${
+                      active
+                        ? "font-bold bg-violetW text-violet"
+                        : "font-semibold text-body hover:bg-cream"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
       </nav>
 
       <div className="flex items-center gap-[8px]">

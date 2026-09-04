@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Card } from "../Card";
 import { Chip, ChipRow } from "../Chip";
-import { ExceptionRow } from "./ExceptionRow";
+import { ExceptionTableRow } from "./ExceptionTableRow";
 import { formatCount } from "./format";
 import type { ExceptionView } from "./types";
 
@@ -122,9 +122,40 @@ export function ExceptionQueue({ rows, scopeLabel }: ExceptionQueueProps) {
             have rows behind them.
           </div>
         ) : (
-          visible.map((row, index) => (
-            <ExceptionRow key={row.id ?? `row-${index}`} row={row} />
-          ))
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              {/*
+                A real header row. The card layout had none, so every row had
+                to re-label its own numbers -- which is a large part of why a
+                row was 150px tall. Labelling once at the top is what buys the
+                density.
+              */}
+              <thead>
+                <tr className="border-b border-rule text-label font-extrabold text-mute">
+                  <th className="py-[7px] pl-[14px] pr-[8px] text-left w-[10px]">
+                    <span className="sr-only">Severity</span>
+                  </th>
+                  <th className="py-[7px] pr-[10px] text-left">Series</th>
+                  <th className="py-[7px] pr-[10px] text-left">Action</th>
+                  <th className="py-[7px] pr-[10px] text-right whitespace-nowrap">
+                    Value at stake
+                  </th>
+                  <th className="py-[7px] pr-[10px] text-right whitespace-nowrap">
+                    Cover / ceiling
+                  </th>
+                  <th className="py-[7px] pr-[10px] text-left">Why</th>
+                  <th className="py-[7px] pr-[14px] text-right">
+                    <span className="sr-only">Expand</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((row, index) => (
+                  <ExceptionTableRow key={row.id ?? `row-${index}`} row={row} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
     </>

@@ -26,7 +26,6 @@ export const ROUTE_WHITELIST = [
   "/buy",
   "/allocation",
   "/markdown",
-  "/launch",
   "/scenarios",
   "/signals",
   "/downstream",

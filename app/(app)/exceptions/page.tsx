@@ -375,8 +375,16 @@ export default async function ExceptionsPage() {
         kpis={kpis}
       />
 
-      <TouchlessBanner touchless={touchless} />
-      <ThresholdBanner ceilings={policy.ceilings} />
+      {/*
+        THE BANNERS MOVED BELOW THE QUEUE.
+        
+        Both are worth reading and neither was cut. But a planner opening this
+        screen is looking for the work, and 182 words of derivation between
+        the header and the first row meant scrolling past an explanation to
+        reach the thing being explained. They now sit under the queue, where
+        somebody who wants to know why a ceiling is 14 weeks will find them --
+        having first seen the rows the ceiling produced.
+      */}
 
       {brandId === null ? (
         <p className="mb-[16px] text-[12.5px] text-body leading-[1.6]">
@@ -388,6 +396,11 @@ export default async function ExceptionsPage() {
       ) : null}
 
       <ExceptionQueue rows={views} scopeLabel={scopeLabel} />
+
+      <div className="mt-[16px]">
+        <TouchlessBanner touchless={touchless} />
+        <ThresholdBanner ceilings={policy.ceilings} />
+      </div>
 
       {stripVersion === null || stripGeneratedAt === null ? null : (
         <ModelStrip

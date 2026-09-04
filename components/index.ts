@@ -80,3 +80,4 @@ export type { ModelStripProps, ModelConfidence } from "./ModelStrip";
 export { RoleGate, roleAllows, type AppRole, type RoleGateProps } from "./RoleGate";
 
 export { AccuracyStatement, type AccuracyStatementProps } from "./AccuracyStatement";
+export { Why } from "./Why";

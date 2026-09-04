@@ -1,5 +1,7 @@
 import type { AccuracyHeadline } from "@/lib/accuracy";
 
+import { Why } from "./Why";
+
 /**
  * AccuracyStatement -- Part H, made unavoidable.
  *
@@ -11,12 +13,20 @@ import type { AccuracyHeadline } from "@/lib/accuracy";
  * screen cannot accidentally quote the flattering number alone.
  *
  * `variant="inline"` is the KPI form for a page header; `variant="bars"` is
- * the accuracy card, with model, seasonal naive and manual on three bars.
+ * the accuracy card, with model, seasonal naive and manual on three bars;
+ * `variant="compact"` is one line for a dense screen.
+ *
+ * THE COMPACT VARIANT STILL OBEYS PART H, and that is the whole reason it
+ * exists in this file rather than being hand-rolled on the two dense screens.
+ * It renders "82.6% . +4.8 vs seasonal naive" -- headline and margin, always
+ * together, in the same breath. What moves behind the disclosure is the fold
+ * count, MASE and the manual comparison, none of which is the thing Part H
+ * protects. A screen that wanted the headline alone still cannot get it.
  */
 
 export type AccuracyStatementProps = {
   accuracy: AccuracyHeadline;
-  variant?: "inline" | "bars";
+  variant?: "inline" | "bars" | "compact";
   className?: string;
 };
 
@@ -55,6 +65,37 @@ export function AccuracyStatement({
   variant = "inline",
   className,
 }: AccuracyStatementProps) {
+  if (variant === "compact") {
+    return (
+      <Why
+        className={className}
+        lead={
+          <>
+            <b className="text-copy font-extrabold text-ink tabular">
+              {a.headlinePct.toFixed(1)}%
+            </b>{" "}
+            <span className="text-mute">&middot;</span>{" "}
+            <b className="font-extrabold text-green">
+              +{a.vsSeasonalNaivePoints.toFixed(1)}
+            </b>{" "}
+            vs seasonal naive
+          </>
+        }
+        label="detail"
+      >
+        Mean of {a.foldCount === null ? "the registry's" : a.foldCount}{" "}
+        rolling-origin {a.foldCount === null ? "folds" : "folds"}, MASE{" "}
+        {a.mase.toFixed(2)} against seasonal naive at{" "}
+        {a.maseSeasonalNaive.toFixed(2)}; below 1.00 beats the benchmark on its
+        own scale. The authored manual baseline sits at {a.manualPct.toFixed(1)}%,
+        so the margin over it is {a.vsManualPoints.toFixed(1)} points -- a bigger
+        number that proves less, because that baseline was calibrated to a
+        target by the dataset designer. Seasonal naive is the benchmark nobody
+        constructed, which is why its margin is the one on the line above.
+      </Why>
+    );
+  }
+
   if (variant === "inline") {
     return (
       <div className={className}>
