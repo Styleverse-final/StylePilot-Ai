@@ -200,6 +200,21 @@ export default async function ScenariosPage({
   const sb = await createServerAnonClient();
   const params = await searchParams;
 
+  // STARTED HERE, AWAITED WHERE THEY ARE NEEDED.
+  //
+  // Neither depends on the forecast base or the plan economics, but both used
+  // to sit behind them: readOwnedCategories needs only the planner id, known
+  // since the top of the function, and readSavedScenarios needs only the
+  // brand. Queued after two blocking reads they had nothing to do with, each
+  // cost a round trip that could have overlapped. The .catch() is attached at
+  // creation so a rejection is handled despite the later await.
+  const ownedPromise = readOwnedCategories(sb, planner?.employeeId ?? null).catch(
+    () => [] as string[],
+  );
+  const savedPromise = readSavedScenarios(sb, brandId, SAVED_SCENARIO_LIMIT).catch(
+    () => [],
+  );
+
   const [triples, labels, elasticity] = await Promise.all([
     readScopeTriples(sb, brandId),
     readLabels(sb),
@@ -305,12 +320,14 @@ export default async function ScenariosPage({
   // writes. One implementation, three callers, no chance of three answers.
   const baseRun = runScenario(base.categories, economics, BASE_LEVERS, 0);
 
-  const ownedCategories = await readOwnedCategories(sb, planner?.employeeId ?? null);
+  const ownedCategories = await ownedPromise;
   const restrictToOwned =
     planner?.appRole === "planner" || planner?.appRole === "category_manager";
   const [anchor, savedRows, marketing] = await Promise.all([
+    // readAnchor genuinely needs ownedCategories, so it stays here -- but the
+    // read it waits on has been in flight since the top of the function.
     readAnchor(sb, brandId, scope, ownedCategories, restrictToOwned),
-    readSavedScenarios(sb, brandId, SAVED_SCENARIO_LIMIT),
+    savedPromise,
     // The marketing lever's caption is a claim about the model, so it is
     // checked against the model's own feature list rather than asserted.
     readMarketingEvidence(sb, base.modelVersions[0] ?? null),
