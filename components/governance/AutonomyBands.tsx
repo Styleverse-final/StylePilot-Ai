@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Pill } from "@/components";
+import { Card, CardBody, CardHeader, Why, Pill } from "@/components";
 import type { AgentRun, AutonomyBand } from "@/lib/queries";
 
 import { UNTABLED_FORECAST_ESCALATION } from "./constants";
@@ -275,8 +275,11 @@ function ForecastArithmetic({ activity }: { activity: BandActivity }) {
 function BandPanel({
   row,
   showArithmetic,
+  bandOwner,
 }: {
   row: BandRow;
+  /** See AutonomyBandsProps.bandOwner. */
+  bandOwner: boolean;
   /**
    * The forecast arithmetic is identical for both brands -- it is a property
    * of the accuracy measure, not of a brand -- so it is printed under the
@@ -314,14 +317,35 @@ function BandPanel({
           : "never widened -- a widening stamps last_widened_at and widened_by onto this row, so a band that moves says who moved it"}
       </Muted>
 
-      <Quote className="mt-[8px]">
-        <span className="font-bold text-ink">Acts within. </span>
-        {band.acts_within}
-      </Quote>
-      <Quote className="mt-[6px]">
-        <span className="font-bold text-ink">Escalates when. </span>
-        {band.escalates_when}
-      </Quote>
+      {/* The band's own clauses. Visible for the roles that set the bands,
+          collapsed for everyone else -- see BAND_OWNER_ROLES. */}
+      {bandOwner ? (
+        <>
+          <Quote className="mt-[8px]">
+            <span className="font-bold text-ink">Acts within. </span>
+            {band.acts_within}
+          </Quote>
+          <Quote className="mt-[6px]">
+            <span className="font-bold text-ink">Escalates when. </span>
+            {band.escalates_when}
+          </Quote>
+        </>
+      ) : (
+        <Why
+          lead="What it acts on, and when it escalates"
+          label="show"
+          className="mt-[8px] block"
+        >
+          <span className="block">
+            <b className="text-ink">Acts within. </b>
+            {band.acts_within}
+          </span>
+          <span className="mt-[6px] block">
+            <b className="text-ink">Escalates when. </b>
+            {band.escalates_when}
+          </span>
+        </Why>
+      )}
 
       {band.agent_name === "forecast_agent" ? (
         showArithmetic ? (
@@ -369,11 +393,20 @@ function BandPanel({
 
 export type AutonomyBandsProps = {
   rows: readonly BandRow[];
+  /**
+   * True for the roles that SET these bands. They read the derivation as
+   * working information; every other role gets it behind <Why>.
+   */
+  bandOwner?: boolean;
   /** The brand on the viewer's planner record, for the scoping sentence. */
   viewerBrandId: string | null;
 };
 
-export function AutonomyBands({ rows, viewerBrandId }: AutonomyBandsProps) {
+export function AutonomyBands({
+  rows,
+  viewerBrandId,
+  bandOwner = false,
+}: AutonomyBandsProps) {
   const brands = [
     ...new Set(rows.map((row) => row.band.brand_id ?? "unassigned")),
   ].sort();
@@ -432,6 +465,7 @@ export function AutonomyBands({ rows, viewerBrandId }: AutonomyBandsProps) {
                     key={key}
                     row={row}
                     showArithmetic={key === firstForecastKey}
+                    bandOwner={bandOwner}
                   />
                 );
               })}

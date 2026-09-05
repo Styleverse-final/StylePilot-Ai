@@ -28,6 +28,7 @@ import { getAccuracyHeadline, type AccuracyHeadline } from "@/lib/accuracy";
 import { getTouchlessRate, type TouchlessRate } from "@/lib/queries";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
+import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 export const metadata: Metadata = {
   title: "Adoption",
@@ -160,6 +161,7 @@ function headerKpis(
 }
 
 export default async function AdoptionPage() {
+  await redirectCmpoToPortfolio();
   const planner = await getSessionPlanner();
   const appRole = planner?.appRole ?? null;
   const isManager = MANAGER_ROLES.includes(appRole ?? "");
@@ -337,7 +339,16 @@ export default async function AdoptionPage() {
           failure rather than four empty tiles, which would look exactly like a
           workforce nobody surveyed.
         </Explain>
-      ) : segments ? (
+      ) : segments && !isManager ? (
+        // THE CURRICULUM DETAIL IS NOT A MANAGER'S SCREEN.
+        //
+        // The readiness segments carry each group's recommended learning
+        // hours, which is curriculum: it belongs to /learning, where the
+        // individual sees their own path. Rendered here it becomes a summary
+        // of who on the team is behind, which is a different artefact and one
+        // nobody asked to be built. A manager reads the trust curve and the
+        // override rate by wave -- whether the team is learning to disagree
+        // well -- and that is what stays.
         <SegmentCards view={segments} />
       ) : null}
 

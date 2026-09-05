@@ -57,6 +57,7 @@ import {
 import { getAccuracyHeadline, type AccuracyHeadline } from "@/lib/accuracy";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
+import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 export const metadata: Metadata = {
   title: "Learning",
@@ -195,6 +196,7 @@ function accuracyForDecisions(
 }
 
 export default async function LearningPage() {
+  await redirectCmpoToPortfolio();
   const planner = await getSessionPlanner();
   const employeeId = planner?.employeeId ?? null;
   const appRole = planner?.appRole ?? null;

@@ -330,8 +330,19 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
         className="mx-auto flex items-center gap-[2px] max-[1140px]:hidden"
       >
         {primary.map((item) => renderTab(item, false))}
-        <span className="mx-[7px] h-[20px] w-px bg-rule2" aria-hidden="true" />
-        {secondary.map((item) => renderTab(item, true))}
+        {/* The rule separates two tiers, so it only earns its place when
+            there are two. A planner and a CMPO both have an empty secondary
+            row, and a divider with nothing after it reads as something
+            failing to load. */}
+        {secondary.length > 0 ? (
+          <>
+            <span
+              className="mx-[7px] h-[20px] w-px bg-rule2"
+              aria-hidden="true"
+            />
+            {secondary.map((item) => renderTab(item, true))}
+          </>
+        ) : null}
 
         {/*
           MORE. Evidence and governance live behind one door rather than

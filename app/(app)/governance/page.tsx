@@ -8,6 +8,7 @@ import {
   type KpiItem,
 } from "@/components";
 import { AutonomyBands, buildBandRows } from "@/components/governance/AutonomyBands";
+import { BAND_OWNER_ROLES } from "@/components/navItems";
 import {
   BandCorrection,
   buildCorrections,
@@ -421,7 +422,11 @@ export default async function GovernancePage({ searchParams }: PageProps) {
             roleLabel={humaniseRole(appRole)}
           />
 
-          <AutonomyBands rows={bandRows} viewerBrandId={brandId} />
+          <AutonomyBands
+            rows={bandRows}
+            viewerBrandId={brandId}
+            bandOwner={BAND_OWNER_ROLES.includes(planner?.appRole ?? "")}
+          />
         </div>
       </div>
 

@@ -43,6 +43,7 @@ import {
 } from "@/lib/accuracy";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
+import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 export const metadata: Metadata = {
   title: "Scenarios",
@@ -183,6 +184,7 @@ export default async function ScenariosPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await redirectCmpoToPortfolio();
   const planner = await getSessionPlanner();
   const brandId = planner?.brandId ?? null;
 

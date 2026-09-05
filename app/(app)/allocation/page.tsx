@@ -31,6 +31,7 @@ import { getAccuracyHeadline, type BrandId } from "@/lib/accuracy";
 import { getAutonomyBands, getRecommendations } from "@/lib/queries";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient, type StyleverseClient } from "@/lib/supabase";
+import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 export const metadata: Metadata = {
   title: "Allocation",
@@ -98,6 +99,7 @@ function isBrandId(value: string | null): value is BrandId {
 }
 
 export default async function AllocationPage({ searchParams }: PageProps) {
+  await redirectCmpoToPortfolio();
   const [planner, params] = await Promise.all([getSessionPlanner(), searchParams]);
   const brandId = planner?.brandId ?? null;
 

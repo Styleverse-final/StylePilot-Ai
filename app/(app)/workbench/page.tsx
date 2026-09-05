@@ -41,6 +41,7 @@ import {
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
 import type { StyleverseClient } from "@/lib/supabase";
+import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 export const metadata: Metadata = {
   title: "Workbench",
@@ -345,6 +346,7 @@ export default async function WorkbenchPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await redirectCmpoToPortfolio();
   const sb = await createServerAnonClient();
   const params = await searchParams;
 

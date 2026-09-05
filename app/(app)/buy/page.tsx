@@ -26,6 +26,7 @@ import { getPolicyParameters, getRecommendations } from "@/lib/queries";
 import type { PolicyParameter } from "@/lib/queries";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
+import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 export const metadata: Metadata = {
   title: "Buy plan",
@@ -142,6 +143,7 @@ function Explain({ children }: { children: ReactNode }) {
 }
 
 export default async function BuyPage() {
+  await redirectCmpoToPortfolio();
   const planner = await getSessionPlanner();
   const brandId = planner?.brandId ?? null;
 

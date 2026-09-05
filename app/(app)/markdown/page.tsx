@@ -42,6 +42,7 @@ import { getAccuracyHeadline, type AccuracyHeadline } from "@/lib/accuracy";
 import { getElasticity, getMarkdownRecs } from "@/lib/queries";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
+import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 export const metadata: Metadata = {
   title: "Markdown optimiser",
@@ -267,6 +268,7 @@ export default async function MarkdownPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await redirectCmpoToPortfolio();
   const planner = await getSessionPlanner();
   const brandId = planner?.brandId ?? null;
   const params = await searchParams;

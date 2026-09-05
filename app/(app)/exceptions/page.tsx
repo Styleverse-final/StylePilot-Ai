@@ -33,6 +33,7 @@ import {
 } from "@/lib/queries";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient, type StyleverseClient } from "@/lib/supabase";
+import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 /**
  * EXCEPTIONS -- the screen the case study is really about.
@@ -303,6 +304,7 @@ export default async function ExceptionsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await redirectCmpoToPortfolio();
   const planner = await getSessionPlanner();
   const brandId = planner?.brandId ?? null;
   const brand: BrandId | undefined =
