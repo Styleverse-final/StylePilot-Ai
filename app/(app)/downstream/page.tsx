@@ -183,6 +183,21 @@ export default async function DownstreamPage() {
   let headlines: AccuracyHeadline[] = [];
   let readError: string | null = null;
 
+  // THREE OF THE FIVE READS BELOW NEED NOTHING FROM THE HANDOFF ROWS.
+  //
+  // getBrandNames, getCategoryNames and the registry are dimension and
+  // annotation reads with no brand filter, yet they sat inside a Promise.all
+  // that could not start until getHandoffRows had returned. Starting them here
+  // overlaps them with the gate read entirely. The other two stay where they
+  // are: getThresholdParameters and getSignalSeries take brandIds, and that
+  // narrowing is what stops them widening past what RLS returned.
+  //
+  // .catch() at creation, so a rejection cannot escape unhandled in the window
+  // before its await. The try/catch below still decides what a failure means.
+  const brandsPromise = getBrandNames(sb).catch(() => ({}) as Record<string, string>);
+  const categoriesPromise = getCategoryNames(sb).catch(() => ({}) as Record<string, string>);
+  const registryPromise = getAccuracyHeadline(sb).catch(() => [] as AccuracyHeadline[]);
+
   try {
     // The handoff read comes first and alone, because everything after it is
     // scoped to the brands it returned. Deriving that list from the rows
@@ -195,13 +210,11 @@ export default async function DownstreamPage() {
     const brandIds = brandsOnScreen(read.rows);
 
     const [brands, categories, params, signals, registry] = await Promise.all([
-      getBrandNames(sb),
-      getCategoryNames(sb),
+      brandsPromise,
+      categoriesPromise,
       getThresholdParameters(sb, brandIds),
       getSignalSeries(sb, brandIds),
-      // Nothing on this screen depends on the registry. It annotates the
-      // strip at the bottom, so a failure there costs the annotation.
-      getAccuracyHeadline(sb).catch(() => [] as AccuracyHeadline[]),
+      registryPromise,
     ]);
 
     brandNames = brands;

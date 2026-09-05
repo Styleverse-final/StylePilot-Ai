@@ -348,7 +348,16 @@ export default async function WorkbenchPage({
   const sb = await createServerAnonClient();
   const params = await searchParams;
 
-  const [scopeRows, labels] = await Promise.all([readScope(sb), readLabels(sb)]);
+  // getSessionPlanner joins the FIRST wave rather than blocking after it.
+  // It depends on nothing above it, and it used to sit alone between the scope
+  // read and everything downstream -- a whole round trip on the critical path
+  // of every workbench render, waiting on nothing. It is React cache()d, so
+  // the layout's earlier call and this one are one request either way.
+  const [scopeRows, labels, planner] = await Promise.all([
+    readScope(sb),
+    readLabels(sb),
+    getSessionPlanner(),
+  ]);
 
   if (scopeRows.length === 0) return <EmptyScope />;
 
@@ -359,7 +368,6 @@ export default async function WorkbenchPage({
   // A brand named in the URL that this session cannot read is discarded, so a
   // hand-edited parameter cannot reach past RLS.
   const brandsInScope = Array.from(new Set(scopeRows.map((r) => r.brand_id)));
-  const planner = await getSessionPlanner();
   const wantedBrand = one(params.brand);
   const brandId =
     brandsInScope.find((b) => b === wantedBrand) ??

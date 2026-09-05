@@ -265,25 +265,38 @@ function AccuracyPanel({ headlines }: { headlines: readonly AccuracyHeadline[] }
 }
 
 export default async function SignalsPage() {
-  const planner = await getSessionPlanner();
   const sb = await createServerAnonClient();
+
+  // THREE ROUND TRIPS THAT NEED NOTHING FROM EACH OTHER.
+  //
+  // These ran in sequence: identity, then scope, then the registry -- so the
+  // page waited out all three end to end before rendering a byte. None of them
+  // reads the result of another. Started together they cost the slowest one.
+  //
+  // .catch() is attached AT CREATION, not at the await. A promise that rejects
+  // with no handler attached in the same tick is an unhandled rejection, which
+  // in a server render is a crash rather than the soft failure these two want.
+  // The try/catch blocks below still own the failure semantics; this only keeps
+  // the rejection from escaping in the gap before its await.
+  const plannerPromise = getSessionPlanner();
+  const scopePromise = readSignalScope(sb);
+  const headlinePromise = getAccuracyHeadline(sb).catch(
+    () => [] as AccuracyHeadline[],
+  );
+
+  const planner = await plannerPromise;
 
   let scope: SignalScope | null = null;
   let scopeError: string | null = null;
   try {
-    scope = await readSignalScope(sb);
+    scope = await scopePromise;
   } catch (error) {
     scopeError = error instanceof Error ? error.message : String(error);
   }
 
   // The registry is annotation, not substance. Its failure costs the
   // accuracy panel and nothing else, so it reads separately.
-  let headlines: AccuracyHeadline[] = [];
-  try {
-    headlines = await getAccuracyHeadline(sb);
-  } catch {
-    headlines = [];
-  }
+  const headlines: AccuracyHeadline[] = await headlinePromise;
 
   if (scopeError !== null || scope === null) {
     return (

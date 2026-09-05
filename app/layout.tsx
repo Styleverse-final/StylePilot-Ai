@@ -18,7 +18,13 @@ import "./globals.css";
 const EM_DASH = String.fromCharCode(0x2014);
 
 const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+  // latin-ext carries the rupee sign. Every money figure on the app is an INR
+  // amount, so this file was being fetched on essentially every screen -- but
+  // discovered LATE, after layout, because next/font only preloads the subsets
+  // it is told about. Naming it here moves the fetch into the preload <link>
+  // and off the critical path. It adds no bytes to the session; it was already
+  // being downloaded.
+  subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600", "700", "800"],
   display: "swap",
   variable: "--font-jakarta",

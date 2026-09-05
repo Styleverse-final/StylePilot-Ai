@@ -1,3 +1,4 @@
+import { cache } from "react";
 // StyleVerse -- typed read layer over the pilot schema.
 //
 // Every function takes the Supabase client as its first argument. Nothing in
@@ -530,7 +531,7 @@ export interface ModelRegistryEntry extends Omit<ModelRow, "metrics"> {
  * The model registry. Pass a model_version to pin one entry; omit it for all
  * four (two planning-grain, two cold-start), newest training run first.
  */
-export async function getModelRegistry(
+export const getModelRegistry = cache(async function getModelRegistry(
   sb: StyleverseClient,
   modelVersion?: string,
 ): Promise<ModelRegistryEntry[]> {
@@ -540,7 +541,7 @@ export async function getModelRegistry(
   const { data, error } = await query.order("trained_at", { ascending: false });
   if (error) fail("getModelRegistry", error);
   return data.map((row) => ({ ...row, metrics: parseModelMetrics(row.metrics) }));
-}
+});
 
 // ============================================================== governance
 

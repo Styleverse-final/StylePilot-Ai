@@ -65,7 +65,7 @@ const SCRIM_BASE =
   "fixed inset-0 z-[60] bg-[rgba(35,31,28,.25)] transition-opacity duration-[160ms]";
 
 const DRAWER_BASE =
-  "fixed inset-y-0 right-0 z-[70] flex w-[min(400px,94vw)] flex-col rounded-l-card bg-white shadow-drawer transition-transform duration-[220ms] ease-[cubic-bezier(.32,.72,0,1)]";
+  "fixed inset-y-0 right-0 z-[70] flex w-[min(400px,94vw)] flex-col rounded-l-card bg-white shadow-drawer transition-transform duration-[160ms] ease-[cubic-bezier(.32,.72,0,1)]";
 
 const PROMPT_CLASS =
   "rounded-quote bg-cream px-[14px] py-[10px] text-left text-copy font-semibold text-ink transition-colors duration-[120ms] hover:bg-peach";

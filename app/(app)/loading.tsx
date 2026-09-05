@@ -22,18 +22,27 @@
  * are mostly a table, the shape is the useful part.
  */
 
+/**
+ * ONE ANIMATION, ON THE ROOT -- NOT SEVENTY-FIVE.
+ *
+ * animate-pulse used to sit on this Bar, so every bar in the skeleton ran its
+ * own infinite opacity animation. At 75 bars that is 75 independent animations
+ * on the compositor for the entire 1.1-1.8s a navigation takes, which is the
+ * one moment the main thread is already busy streaming and hydrating the page
+ * the reader asked for.
+ *
+ * They all pulse in unison anyway -- same duration, same start -- so a single
+ * animation on the container is visually identical and costs one.
+ */
 function Bar({ w, h = 12 }: { w: string; h?: number }) {
   return (
-    <div
-      className="animate-pulse rounded-pill bg-rule"
-      style={{ width: w, height: `${h}px` }}
-    />
+    <div className="rounded-pill bg-rule" style={{ width: w, height: `${h}px` }} />
   );
 }
 
 export default function Loading() {
   return (
-    <div aria-busy="true" aria-live="polite">
+    <div aria-busy="true" aria-live="polite" className="animate-pulse">
       <span className="sr-only">Loading this screen</span>
 
       {/* The page header: eyebrow, title, then a row of KPI blocks. */}
@@ -54,9 +63,25 @@ export default function Loading() {
         </div>
       </div>
 
-      {/* The work itself: a table's worth of rows, at the real row rhythm. */}
-      <div className="rounded-card border border-rule bg-white px-[14px] py-[10px]">
-        <div className="flex items-center gap-[14px] border-b border-rule pb-[9px]">
+      {/* The filter chips above the table on /exceptions and /buy. Without a
+          stand-in, 47px of chip row appears out of nothing and shoves the
+          table down at the exact moment the reader starts reading it. */}
+      <div className="mb-[16px] flex flex-wrap gap-[7px]">
+        {[86, 104, 110, 78, 108].map((w, i) => (
+          <div
+            key={i}
+            className="h-[31px] rounded-pill bg-white"
+            style={{ width: `${w}px` }}
+          />
+        ))}
+      </div>
+
+      {/* The work itself: a table's worth of rows, at the real row rhythm.
+          No border and no padding -- the real Card has neither, and painting
+          them here means a 1px outline and 14px of inset vanish when the rows
+          land. */}
+      <div className="overflow-hidden rounded-card bg-white">
+        <div className="flex items-center gap-[14px] border-b border-rule px-[14px] py-[9px]">
           <Bar w="8px" h={8} />
           <Bar w="180px" h={9} />
           <Bar w="90px" h={9} />
@@ -66,11 +91,14 @@ export default function Loading() {
           </div>
         </div>
 
-        {Array.from({ length: 12 }, (_, i) => (
+        {/* 20 rows at 35px, matching the real table. It was 12 rows at 30px,
+            so the skeleton stood 360px tall where the content arrives at 700px
+            and the page grew under the reader on every navigation. */}
+        {Array.from({ length: 20 }, (_, i) => (
           <div
             key={i}
-            className="flex items-center gap-[14px] border-b border-rule py-[9px] last:border-b-0"
-            style={{ opacity: Math.max(0.25, 1 - i * 0.06) }}
+            className="flex items-center gap-[14px] border-b border-rule px-[14px] py-[7px] last:border-b-0"
+            style={{ height: "35px", opacity: Math.max(0.25, 1 - i * 0.04) }}
           >
             <Bar w="8px" h={8} />
             <Bar w={`${150 + ((i * 37) % 90)}px`} h={11} />

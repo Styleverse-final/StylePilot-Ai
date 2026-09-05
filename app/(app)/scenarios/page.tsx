@@ -36,7 +36,11 @@ import {
 } from "@/components/scenarios/format";
 import { BASE_LEVERS, runScenario } from "@/components/scenarios/model";
 import { sameScope, type ScenarioScope } from "@/components/scenarios/note";
-import { getAccuracyHeadline, type BrandId } from "@/lib/accuracy";
+import {
+  getAccuracyHeadline,
+  type AccuracyHeadline,
+  type BrandId,
+} from "@/lib/accuracy";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
 
@@ -214,6 +218,11 @@ export default async function ScenariosPage({
   const savedPromise = readSavedScenarios(sb, brandId, SAVED_SCENARIO_LIMIT).catch(
     () => [],
   );
+  // Brand-only, like the two above, and needed far below. It used to be a bare
+  // await between two reads that have nothing to do with it.
+  const accuraciesPromise = isBrandId(brandId)
+    ? getAccuracyHeadline(sb, brandId).catch(() => [] as AccuracyHeadline[])
+    : Promise.resolve([] as AccuracyHeadline[]);
 
   const [triples, labels, elasticity] = await Promise.all([
     readScopeTriples(sb, brandId),
@@ -256,9 +265,10 @@ export default async function ScenariosPage({
   // shown ECO's headline as though it described their own book. There is no
   // fallback now: where this brand has no readable planning-grain registry
   // row, the screen renders no percentage at all and says why.
-  const accuracies = isBrandId(brandId)
-    ? await getAccuracyHeadline(sb, brandId)
-    : [];
+  // Started with the other brand-only reads above rather than awaited here,
+  // where it was a bare round trip wedged between two reads that need nothing
+  // from it. Same value, one wave earlier.
+  const accuracies = await accuraciesPromise;
   const accuracy = accuracies.find((a) => a.brandId === brandId);
 
   const scopeLabel =
