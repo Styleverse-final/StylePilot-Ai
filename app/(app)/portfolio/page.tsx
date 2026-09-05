@@ -6,6 +6,7 @@ import { Banner, PageHeader, Why } from "@/components";
 import type { KpiItem } from "@/components";
 import { AdoptionPanel } from "@/components/portfolio/Adoption";
 import { BrandSwitcher } from "@/components/portfolio/BrandSwitcher";
+import { Greeting } from "@/components/dashboard/Greeting";
 import {
   adoptionFindings,
   readAdoption,
@@ -166,6 +167,14 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
   if (!planner) redirect("/login");
   if (!PORTFOLIO_ROLES.includes(planner.appRole ?? "")) redirect("/");
 
+  // First name only, from the session. Null where the record has no name, in
+  // which case the header falls back to the plain title.
+  const greetingName = (() => {
+    const trimmed = (planner.fullName ?? "").trim();
+    if (trimmed.length === 0) return null;
+    return trimmed.split(/\s+/)[0] ?? trimmed;
+  })();
+
   const sb = await createServerAnonClient();
 
   // Scope first: nothing else can be read until we know which brands row
@@ -244,7 +253,12 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
                 ? `Brand portfolio - ${brandLabels[0]}`
                 : "Portfolio"
         }
-        title="Portfolio"
+        title={
+          // Same greeting as the dashboard. A CMPO is redirected here from /,
+          // so without this the two demonstration roles would get a different
+          // welcome for no reason a reader could see.
+          greetingName ? <Greeting name={greetingName} /> : "Portfolio"
+        }
         kpis={headerKpis(value, undecided)}
       />
 

@@ -40,8 +40,11 @@ export type KpiItem = {
 export type PageHeaderProps = {
   /** 11.5px muted line above the title. */
   eyebrow: string;
-  /** 26px page title. */
-  title: string;
+  /**
+   * 26px page title. A node rather than a string because the dashboard's
+   * title is the animated greeting; every other screen still passes text.
+   */
+  title: ReactNode;
   /** Inline KPI row, between the title and the Ask button. */
   kpis?: readonly KpiItem[];
   /** Extra header controls, placed after the KPIs and before the Ask button. */
