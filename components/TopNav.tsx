@@ -117,11 +117,39 @@ function isActive(pathname: string, href: string): boolean {
  * the full payload. Worst case the hover buys nothing and the screen behaves
  * exactly as it does today; it cannot be worse.
  *
- * router.prefetch() fetches the FULL route, and per the staleTimes docs a
- * route fetched this way is held under `static` (180s here), not `dynamic`
- * (30s) -- the longer window, because a deliberate prefetch is treated the
- * same as a fully-prefetched link.
+ * router.prefetch() DOES NOT fetch the full route by default, which is the
+ * whole reason this needed a second look. Its second argument is optional and
+ * next/dist/client/components/app-router-instance.js:300 reads
+ *
+ *     const prefetchKind = options?.kind ?? PrefetchKind.AUTO
+ *
+ * so a bare router.prefetch(href) takes the AUTO branch, which maps to
+ * FetchStrategy.PPR -- the same partial fetch a default <Link> does. On a
+ * dynamic route with a loading boundary that is the 250-byte skeleton and
+ * none of the rows. Hovering was warming the spinner.
+ *
+ * PrefetchKind.FULL maps to FetchStrategy.Full, which fetches the route's
+ * data. Passing it is the difference between prefetching the wait and
+ * prefetching the answer.
+ *
+ * Per the staleTimes docs a route fetched through router.prefetch is then
+ * held under `static` (180s here) rather than `dynamic` (30s).
  */
+/**
+ * PrefetchKind.FULL, as the value the runtime switch actually compares against.
+ *
+ * The enum lives at next/dist/client/components/router-reducer/router-reducer-types
+ * and importing from there reaches past the package's public surface into a path
+ * that has moved between versions. So the OPTIONS TYPE is derived from the router
+ * API itself instead: if Next changes prefetch's signature this stops compiling
+ * here rather than silently degrading to a partial prefetch at runtime, which is
+ * the failure this whole comment exists because of.
+ */
+type PrefetchOptions = NonNullable<
+  Parameters<ReturnType<typeof useRouter>["prefetch"]>[1]
+>;
+const FULL = { kind: "full" } as unknown as PrefetchOptions;
+
 const prefetched = new Set<string>();
 
 function usePrefetchOnce() {
@@ -131,7 +159,7 @@ function usePrefetchOnce() {
     // every re-entry, and each one is a real server render.
     if (prefetched.has(href)) return;
     prefetched.add(href);
-    router.prefetch(href);
+    router.prefetch(href, FULL);
   };
 }
 
@@ -195,7 +223,7 @@ function useWarmPrimary(primary: readonly NavItem[], pathname: string) {
           window.setTimeout(() => {
             if (cancelled || prefetched.has(href)) return;
             prefetched.add(href);
-            router.prefetch(href);
+            router.prefetch(href, FULL);
           }, i * WARM_GAP_MS),
         );
       });
