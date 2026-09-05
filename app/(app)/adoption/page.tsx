@@ -174,10 +174,35 @@ export default async function AdoptionPage() {
   // reallocation panel that had already been built. Each block degrades on
   // its own and names the one that failed.
 
+  // ...AND FOUR INDEPENDENT ROUND TRIPS, WHICH IS A SEPARATE POINT.
+  //
+  // Independent FAILURES is why there are four try blocks, and that is right.
+  // But independent failure did not require sequential EXECUTION, and that is
+  // what it got: segments, then reallocation, then the manager panels, then
+  // the registry -- four round-trip latencies end to end for reads that share
+  // no data. Started together they cost the slowest one, and each still fails
+  // into its own block.
+  //
+  // The manager reads are started only when isManager, so a planner does not
+  // pay for panels they will not be shown.
+  //
+  // A no-op rejection handler is attached to each at creation: that marks the
+  // promise handled so a rejection arriving before its await cannot escape as
+  // an unhandled rejection. The await below still rejects into its own catch.
+  const adoptionPromise = getAdoptionRows(sb);
+  const reallocationGroup = Promise.all([getTimeRows(sb), getTouchlessRate(sb)]);
+  const managerGroup = isManager
+    ? Promise.all([getWavePeople(sb), getProgressRows(sb), getHumanDecisionRows(sb)])
+    : null;
+  const headlinePromise = getAccuracyHeadline(sb);
+  for (const pending of [adoptionPromise, reallocationGroup, managerGroup, headlinePromise]) {
+    pending?.catch(() => {});
+  }
+
   let segments: SegmentView | null = null;
   let segmentsError: string | null = null;
   try {
-    segments = buildSegments(await getAdoptionRows(sb));
+    segments = buildSegments(await adoptionPromise);
   } catch (error) {
     segmentsError = error instanceof Error ? error.message : String(error);
   }
@@ -186,10 +211,7 @@ export default async function AdoptionPage() {
   let touchless: TouchlessRate | null = null;
   let reallocationError: string | null = null;
   try {
-    const [timeRows, rate] = await Promise.all([
-      getTimeRows(sb),
-      getTouchlessRate(sb),
-    ]);
+    const [timeRows, rate] = await reallocationGroup;
     touchless = rate;
     // The rate the formula turns on, computed from the view's own numerator
     // and denominator rather than from its rounded in_scope_rate column, so
@@ -207,11 +229,7 @@ export default async function AdoptionPage() {
   let curveError: string | null = null;
   if (isManager) {
     try {
-      const [people, progress, decisions] = await Promise.all([
-        getWavePeople(sb),
-        getProgressRows(sb),
-        getHumanDecisionRows(sb),
-      ]);
+      const [people, progress, decisions] = await managerGroup!;
       curve = buildTrustCurve(people, progress);
       sample = buildDecisionSample(people, decisions);
     } catch (error) {
@@ -221,7 +239,7 @@ export default async function AdoptionPage() {
 
   let headlines: AccuracyHeadline[] = [];
   try {
-    headlines = await getAccuracyHeadline(sb);
+    headlines = await headlinePromise;
   } catch {
     headlines = [];
   }
