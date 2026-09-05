@@ -34,7 +34,17 @@ import { NextResponse, type NextRequest } from 'next/server'
  * app/login/page.tsx -- keep them in step.
  */
 
-const PUBLIC_PREFIXES = ['/login', '/auth'] as const
+/**
+ * Reachable without a session cookie.
+ *
+ * /api/cron is here because a scheduled invocation has no session and never
+ * will -- Vercel calls it with an Authorization: Bearer $CRON_SECRET header
+ * instead. Left out, the proxy redirected the nightly run to /login, which
+ * fails silently: the cron records a 307, nothing runs, and no screen shows
+ * anything wrong. The route authenticates ITSELF against CRON_SECRET and
+ * answers 401 without one, so this prefix opens a door that is still locked.
+ */
+const PUBLIC_PREFIXES = ['/login', '/auth', '/api/cron'] as const
 
 const FALLBACK_PATH = '/'
 
