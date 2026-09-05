@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
 import { CopilotProvider } from "@/components/CopilotDrawer";
+import { WelcomeOverlay } from "@/components/WelcomeOverlay";
 import { TopNav } from "@/components/TopNav";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
@@ -48,11 +49,47 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  const [planner, exceptionCount] = await Promise.all([
+  // The two facts the sign-in intro needs beside the name: the reader's job
+  // title and their company. Both are one small row, both join the wave that
+  // was already running, and both fail soft -- an unreadable row drops that
+  // half of the subtitle rather than failing the shell for a decoration.
+  // Returns the ROWS, not a pick. The pick needs the planner's own id and
+  // brand, which resolve in the same wave as this read, so choosing here
+  // would mean taking data[0] -- and data[0] of dim_brand is whichever brand
+  // sorts first, not the reader's. An EcoWeave CMPO would have been welcomed
+  // to SpeedStyle. The match happens below, once identity is known.
+  const readIdentityRows = async (): Promise<{
+    roles: { employee_id: string; role: string | null }[];
+    brands: { brand_id: string; brand_name: string | null }[];
+  }> => {
+    try {
+      const sb = await createServerAnonClient();
+      const [adoption, brands] = await Promise.all([
+        sb.from("planner_adoption").select("employee_id, role"),
+        sb.from("dim_brand").select("brand_id, brand_name"),
+      ]);
+      return { roles: adoption.data ?? [], brands: brands.data ?? [] };
+    } catch {
+      return { roles: [], brands: [] };
+    }
+  };
+
+  const [planner, exceptionCount, identity] = await Promise.all([
     getSessionPlanner(),
     countExceptions(),
+    readIdentityRows(),
   ]);
   if (!planner) redirect("/login");
+
+  // Matched on the reader's own employee id and brand. A miss leaves the
+  // field null and the intro drops that half of the line rather than
+  // asserting somebody else's job title or another brand's name.
+  const welcomeRole =
+    identity.roles.find((row) => row.employee_id === planner.employeeId)?.role ??
+    null;
+  const welcomeCompany =
+    identity.brands.find((row) => row.brand_id === planner.brandId)?.brand_name ??
+    null;
 
   // NO SIGN-OUT SERVER ACTION HERE, DELIBERATELY.
   //
@@ -63,6 +100,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // one to go stale.
   return (
     <CopilotProvider>
+      {planner.fullName ? (
+        <WelcomeOverlay
+          name={planner.fullName}
+          role={welcomeRole}
+          company={welcomeCompany}
+        />
+      ) : null}
       <div className="mx-auto min-w-[1140px] max-w-[1400px] px-[20px] pb-[44px] pt-[16px] max-[1140px]:min-w-0">
         <TopNav
           exceptionCount={exceptionCount}

@@ -71,19 +71,20 @@
 }
 
 /*
- * The dashboard greeting: the respondent's name, then the time-of-day
- * greeting, each entering with a short rise.
+ * The sign-in intro layer.
  *
- * DEFAULT STATE IS VISIBLE. The rule below only adds motion on the way in,
- * so when the prefers-reduced-motion block above sets `animation: none` the
- * text is simply there at full opacity rather than stranded at opacity 0 --
- * which is what a `from { opacity: 0 }` with no visible resting state would
- * do to every reader who has reduced motion switched on.
+ * DEFAULT STATE IS THE VISIBLE, SETTLED ONE. The prefers-reduced-motion block
+ * above sets `animation: none !important` on everything, so a rule that only
+ * described the entry -- opacity 0, translated down -- would strand this
+ * panel invisible for those readers, or worse, strand it OPAQUE over the app
+ * with no fade-out. The component removes itself immediately under reduced
+ * motion for that reason, and these rules animate into the resting state
+ * rather than away from it.
  */
-@keyframes sv-greet-in {
+@keyframes sv-welcome-rise {
   from {
     opacity: 0;
-    transform: translateY(9px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -91,6 +92,33 @@
   }
 }
 
-.sv-greet-in {
-  animation: sv-greet-in 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+@keyframes sv-welcome-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sv-welcome {
+  animation: sv-welcome-fade 160ms ease-out both;
+  transition: opacity 320ms ease, transform 320ms ease;
+}
+
+/* 0.0s: the greeting rises in. */
+.sv-welcome-line {
+  animation: sv-welcome-rise 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* 0.3s: role and company follow it. */
+.sv-welcome-sub {
+  animation: sv-welcome-rise 380ms cubic-bezier(0.22, 0.61, 0.36, 1) 300ms both;
+}
+
+/* ~0.7s: the whole layer leaves, lifting very slightly as it goes. */
+.sv-welcome-out {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
 }

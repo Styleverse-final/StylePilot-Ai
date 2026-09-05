@@ -11,7 +11,6 @@ import {
 } from "@/components";
 import type { ModelConfidence } from "@/components";
 import { AccuracyCard } from "@/components/dashboard/AccuracyCard";
-import { Greeting } from "@/components/dashboard/Greeting";
 import { AgentActivity } from "@/components/dashboard/AgentActivity";
 import { DecisionThreads } from "@/components/dashboard/DecisionThreads";
 import { EmbargoNotice } from "@/components/dashboard/EmbargoNotice";
@@ -116,19 +115,6 @@ function coverageFor(rows: readonly RecommendationState[]): DriverCoverage {
 }
 
 /** The eyebrow above the title: the date the displayed rows were generated. */
-/**
- * The name a person is greeted by, which is the first one.
- *
- * Falls back to the whole string when there is no space to split on, and the
- * caller renders no greeting at all when there is no name -- a greeting
- * addressed to nobody is worse than none.
- */
-function firstNameOf(fullName: string | null): string | null {
-  const trimmed = (fullName ?? "").trim();
-  if (trimmed.length === 0) return null;
-  return trimmed.split(/\s+/)[0] ?? trimmed;
-}
-
 function eyebrowFor(generatedAt: string | null): string {
   const stamp = formatStamp(generatedAt);
   return stamp
@@ -142,19 +128,6 @@ export default async function DashboardPage() {
 
   const brandId = planner?.brandId ?? null;
   const sb = await createServerAnonClient();
-
-  // The brand's display name, so the header reads SpeedStyle rather than SPD.
-  //
-  // Promise.resolve() around the builder is load-bearing, not ceremony. A
-  // PostgREST query builder is a THENABLE, not a promise: it does not issue
-  // the request until something calls .then() on it. Assigning it to a
-  // variable and awaiting it later would run it later -- serially, after the
-  // wave below, which is the opposite of the intent. Promise.resolve adopts
-  // the thenable, which calls .then() now, so the request is genuinely in
-  // flight alongside everything else.
-  const brandNamesPromise = Promise.resolve(
-    sb.from("dim_brand").select("brand_id, brand_name"),
-  ).catch(() => ({ data: null }));
 
   const [
     accuracyRows,
@@ -265,25 +238,9 @@ export default async function DashboardPage() {
 
   const stamp = formatStamp(generatedAt);
 
-  // "SpeedStyle", not "SPD". Unreadable leaves the eyebrow as it was rather
-  // than printing an internal code at the reader.
-  const { data: brandRows } = await brandNamesPromise;
-  const brandName =
-    (brandRows ?? []).find((row) => row.brand_id === brandId)?.brand_name ?? null;
-  const greetingName = firstNameOf(planner?.fullName ?? null);
-
   return (
     <>
-      <PageHeader
-        eyebrow={
-          brandName
-            ? `${brandName} ${MIDDOT} ${eyebrowFor(generatedAt)}`
-            : eyebrowFor(generatedAt)
-        }
-        title={
-          greetingName ? <Greeting name={greetingName} /> : "Command centre"
-        }
-      >
+      <PageHeader eyebrow={eyebrowFor(generatedAt)} title="Command centre">
         <KpiRow>
           {/* Part H: never the headline on its own. */}
           {accuracy === null ? (
