@@ -237,11 +237,6 @@ export default async function DashboardPage() {
     "no model row in scope";
 
   const stamp = formatStamp(generatedAt);
-  // The lock tag is a claim about the data, so it needs a row to stand on:
-  // an unreadable embargo table is not evidence that anything is sealed.
-  const embargoLocked =
-    embargo.length > 0 &&
-    embargo.every((row) => (row.weeks_revealed ?? 0) === 0);
 
   return (
     <>
@@ -319,13 +314,6 @@ export default async function DashboardPage() {
             touchless={touchless}
             openExceptionCount={openExceptions.length}
             openExceptionValueInr={sumValue(openExceptions)}
-            headerTag={
-              embargoLocked ? (
-                <span className="rounded-pill bg-amberW px-[12px] py-[5px] text-[11.5px] font-bold text-amber">
-                  Forward actuals locked
-                </span>
-              ) : undefined
-            }
           />
           <AgentActivity runs={agentRuns} now={Date.now()} />
         </div>

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 
 import { Card, CardBody, CardHeader, Why } from "@/components";
 import type { TouchlessRate } from "@/lib/queries";
@@ -65,8 +64,6 @@ export const OPEN_EXCEPTIONS_HREF = "/exceptions?status=open";
 
 export type DecisionThreadsProps = {
   touchless: TouchlessRate | null;
-  /** Rendered in the header slot, e.g. the forward-actuals lock tag. */
-  headerTag?: ReactNode;
   /**
    * Exceptions in THIS reader's scope carrying no decision row, and what they
    * are worth. Not a slice of the counts above -- those are brand totals --
@@ -116,7 +113,6 @@ function Legend({
 
 export function DecisionThreads({
   touchless,
-  headerTag,
   openExceptionCount,
   openExceptionValueInr,
 }: DecisionThreadsProps) {
@@ -149,7 +145,6 @@ export function DecisionThreads({
       <CardHeader
         title="This week's decisions"
         subtitle="Every recommendation in the brand's programme, by how it was disposed of"
-        actions={headerTag}
       />
       <CardBody>
         {total === 0 ? (
