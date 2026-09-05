@@ -202,12 +202,37 @@ export default async function GovernancePage({ searchParams }: PageProps) {
   let labels: SeriesLabels = { category: {}, channel: {}, region: {} };
   let ledgerError: string | null = null;
 
+  // FOUR WAVES THAT SHARED NO DATA, NOW ONE.
+  //
+  // These eight reads ran as four sequential Promise.all groups -- ledger,
+  // then bands, then agent runs, then the registry -- so the page waited out
+  // four round-trip latencies end to end. Nothing in any group reads a result
+  // from an earlier one. Started together they cost the slowest single read.
+  // This was the slowest route in the app at 1,965ms warm.
+  //
+  // The try/catch blocks below are UNCHANGED and still decide what each
+  // failure means. The only thing added here is a no-op rejection handler on
+  // each promise: attaching one marks the promise handled, so a rejection in
+  // the window before its await cannot surface as an unhandled rejection and
+  // take down the render. The later `await` still rejects into its own catch.
+  const ledgerGroup = Promise.all([
+    getLedger(sb),
+    getPeople(sb),
+    getSeriesLabels(sb),
+  ]);
+  const governanceGroup = Promise.all([
+    getAllAutonomyBands(sb),
+    getPolicyParameterByName(sb, "allocation_band_pp"),
+    getKillSwitch(sb),
+  ]);
+  const runsPromise = getAgentRuns(sb, 200);
+  const headlinePromise = getAccuracyHeadline(sb);
+  for (const pending of [ledgerGroup, governanceGroup, runsPromise, headlinePromise]) {
+    pending.catch(() => {});
+  }
+
   try {
-    const [ledger, roster, seriesLabels] = await Promise.all([
-      getLedger(sb),
-      getPeople(sb),
-      getSeriesLabels(sb),
-    ]);
+    const [ledger, roster, seriesLabels] = await ledgerGroup;
     entries = ledger;
     people = roster;
     labels = seriesLabels;
@@ -221,11 +246,7 @@ export default async function GovernancePage({ searchParams }: PageProps) {
   let governanceError: string | null = null;
 
   try {
-    const [bandRows, policies, switchRow] = await Promise.all([
-      getAllAutonomyBands(sb),
-      getPolicyParameterByName(sb, "allocation_band_pp"),
-      getKillSwitch(sb),
-    ]);
+    const [bandRows, policies, switchRow] = await governanceGroup;
     bands = bandRows;
     allocationPolicies = policies;
     killSwitch = switchRow;
@@ -238,14 +259,14 @@ export default async function GovernancePage({ searchParams }: PageProps) {
   // costs the activity line under each band and nothing else.
   let runs: AgentRun[] = [];
   try {
-    runs = await getAgentRuns(sb, 200);
+    runs = await runsPromise;
   } catch {
     runs = [];
   }
 
   let headlines: AccuracyHeadline[] = [];
   try {
-    headlines = await getAccuracyHeadline(sb);
+    headlines = await headlinePromise;
   } catch {
     headlines = [];
   }
