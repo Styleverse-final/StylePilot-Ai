@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createServerClient } from "@/lib/supabase-server";
+import { decodeSealed, toFactRow, type SealedRow } from "@/lib/embargo";
 
 /**
  * THE NIGHTLY AGENT PASS.
@@ -123,6 +124,62 @@ export async function GET(request: NextRequest) {
   const dryRun = request.nextUrl.searchParams.get("dry") === "1";
   const sb = await createServerClient();
 
+  // ---- 1. Reveal any forward week whose embargo has matured ----------------
+  //
+  // WHERE reveal_on <= current_date is the whole date check, and it is here --
+  // on the one piece of code that runs unattended -- rather than in the
+  // loader. The loader stores sealed rows; only this decides a week has come.
+  //
+  // Nothing is written unless the decode proves itself: decodeSealed returns
+  // null for anything that is not valid JSON of the expected shape and length,
+  // so a wrong key derivation reveals nothing rather than filling the history
+  // with plausible noise. This code could not be tested before the first
+  // reveal date without breaking the embargo it exists to honour, which is
+  // exactly why it validates every row instead of being trusted.
+  const today = new Date().toISOString().slice(0, 10);
+  const reveal = { matured: 0, written: 0, undecodable: 0 };
+
+  const { data: sealed } = await sb
+    .from("embargo_payload")
+    .select(
+      "id, grain, brand_id, iso_week, week_start, reveal_on, category_id, " +
+        "channel_id, region_id, style_id, encoded_payload_b64, " +
+        "payload_checksum, field_count",
+    )
+    .lte("reveal_on", today)
+    .is("applied_at", null)
+    .eq("grain", "planning")
+    .limit(1000);
+
+  const factRows: Record<string, unknown>[] = [];
+  const revealedIds: number[] = [];
+
+  for (const row of (sealed ?? []) as unknown as SealedRow[]) {
+    reveal.matured += 1;
+    const values = decodeSealed(row);
+    if (values === null) {
+      reveal.undecodable += 1;
+      continue;
+    }
+    factRows.push(toFactRow(row, values));
+    revealedIds.push(row.id);
+  }
+
+  if (!dryRun && factRows.length > 0) {
+    const { error: factError } = await sb
+      .from("fact_demand_weekly")
+      .insert(factRows as never);
+    if (!factError) {
+      reveal.written = factRows.length;
+      // Marked only after the fact rows landed, so a failure here leaves the
+      // week unrevealed and the next run retries it rather than losing it.
+      await sb
+        .from("embargo_payload")
+        .update({ applied_at: new Date().toISOString() } as never)
+        .in("id", revealedIds);
+    }
+  }
+
   // The kill switch is checked FIRST and before any read that could be
   // mistaken for work. Engaged means the pass does not happen at all.
   const { data: killRows } = await sb
@@ -244,7 +301,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (dryRun) {
-    return NextResponse.json({ ran: false, dryRun: true, summaries });
+    return NextResponse.json({ ran: false, dryRun: true, reveal, summaries });
   }
 
   // Decisions first, runs second. If the insert fails the run row is not
@@ -265,6 +322,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ran: true,
+    reveal,
     decisionsWritten: written,
     runRowsWritten: runError ? 0 : runRows.length,
     runError: runError?.message ?? null,

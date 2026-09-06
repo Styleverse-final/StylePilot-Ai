@@ -544,6 +544,60 @@ export type Database = {
           },
         ]
       }
+      embargo_payload: {
+        Row: {
+          applied_at: string | null
+          brand_id: string
+          category_id: string | null
+          channel_id: string | null
+          encoded_payload_b64: string
+          field_count: number | null
+          grain: string
+          id: number
+          iso_week: string
+          loaded_at: string
+          payload_checksum: string | null
+          region_id: string | null
+          reveal_on: string
+          style_id: string | null
+          week_start: string
+        }
+        Insert: {
+          applied_at?: string | null
+          brand_id: string
+          category_id?: string | null
+          channel_id?: string | null
+          encoded_payload_b64: string
+          field_count?: number | null
+          grain: string
+          id?: number
+          iso_week: string
+          loaded_at?: string
+          payload_checksum?: string | null
+          region_id?: string | null
+          reveal_on: string
+          style_id?: string | null
+          week_start: string
+        }
+        Update: {
+          applied_at?: string | null
+          brand_id?: string
+          category_id?: string | null
+          channel_id?: string | null
+          encoded_payload_b64?: string
+          field_count?: number | null
+          grain?: string
+          id?: number
+          iso_week?: string
+          loaded_at?: string
+          payload_checksum?: string | null
+          region_id?: string | null
+          reveal_on?: string
+          style_id?: string | null
+          week_start?: string
+        }
+        Relationships: []
+      }
       fact_demand_weekly: {
         Row: {
           availability_ratio: number | null
