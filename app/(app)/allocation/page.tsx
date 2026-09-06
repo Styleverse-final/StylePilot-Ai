@@ -6,11 +6,23 @@ import {
   Card,
   CardBody,
   CardHeader,
+  KpiCard,
   ModelStrip,
+  PageFooter,
   PageHeader,
-  type KpiItem,
+  Pill,
 } from "@/components";
 import { AgentBandCard } from "@/components/allocation/AgentBandCard";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  BulbIcon,
+  GarmentIcon,
+  GridIcon,
+  SettlingCurve,
+  TargetIcon,
+  UsersIcon,
+} from "@/components/allocation/icons";
 import { IncumbentDriftCard } from "@/components/allocation/IncumbentDriftCard";
 import {
   MIDDOT,
@@ -145,28 +157,6 @@ export default async function AllocationPage({ searchParams }: PageProps) {
   const provenance = provenanceOf(shifts);
   const accuracy = accuracies[0] ?? null;
 
-  const kpis: KpiItem[] = [
-    { label: "Cells in scope", value: String(shifts.length) },
-    {
-      label: "Shift in",
-      value: String(counts.shiftIn),
-      pill: counts.shiftIn > 0 ? "regions gaining" : undefined,
-      tone: "up",
-    },
-    {
-      label: "Shift out",
-      value: String(counts.shiftOut),
-      pill: counts.shiftOut > 0 ? "regions giving up" : undefined,
-      tone: "down",
-    },
-    {
-      label: "Inside the agent band",
-      value: String(counts.within),
-      pill: ceilingPp === null ? "no band" : `under ${formatCeiling(ceilingPp)}`,
-      tone: ceilingPp === null ? "grey" : "violet",
-    },
-  ];
-
   const seriesOptions: SeriesOption[] = groups.map((candidate) => ({
     value: candidate.key,
     label: `${labels.categories[candidate.categoryId] ?? candidate.categoryId} ${MIDDOT} ${
@@ -176,20 +166,230 @@ export default async function AllocationPage({ searchParams }: PageProps) {
     escalating: candidate.escalating,
   }));
 
+  /*
+    FIVE CARDS RATHER THAN THE FLAT KPI ROW.
+
+    The flat row was right while these were four reference figures a planner
+    glanced past on the way to the board. They are not that: the first three
+    are the shape of the week's movement, the fourth is the governance line
+    drawn through it, and the fifth is the evidence that the model proposing
+    all of it is worth following. Each one needed a caveat that the flat row
+    had nowhere to put -- what the denominator is, what "inside the band"
+    counts, how many folds the accuracy is a mean of -- and each now carries
+    it behind its own disclosure rather than dropping it.
+
+    The tone on each tile is the app's own palette rather than decoration:
+    green for units arriving, red for units leaving, violet for the agent,
+    green again for the model against its benchmarks. A reader who has seen
+    the exception queue or the buy plan already knows what those mean.
+
+    THE FIVE STAY ON ONE LINE, WHICH IS WHY THEY SIT IN THE BAND. Squeezed
+    between the title and the Ask button these five get about a thousand
+    pixels, and the last two drop to a second row -- which reads as two groups
+    of measures when it is one. The band is the full-width row under the title
+    and it is exactly what PageHeader documents it for; the buy plan puts its
+    own five there for the same reason.
+
+    THE FIVE TRACKS ARE NOT EQUAL. Each is minmax(max-content, <share>): the
+    FLOOR is whatever that card actually contains, and the share only decides
+    how the slack above the floors is divided. Fixed fr weights cannot do this
+    -- a track narrower than its own label does not wrap the card, it overflows
+    it, and the label of an inline KpiCard is deliberately unwrappable so that
+    five cards in a row stand the same height. Sizing from content is also
+    what keeps each pill on the value line instead of dropping under it, and
+    it means no weight here has to be re-guessed when a count goes from two
+    digits to three.
+
+    The shares are near-even because the first four cards are near-even; the
+    accuracy card takes about a third more because it carries a percentage, a
+    pill AND the line naming the folds and benchmarks behind it. Below 1180px
+    there is no width at which five fit, and it falls to three, then two.
+
+    Part H is why the accuracy card is rendered by AccuracyStatement and not
+    by a KpiCard here: that component cannot draw the headline without the
+    seasonal-naive margin beside it, and no accuracy percentage is written as
+    a literal anywhere in this file.
+  */
+  const headerCards = (
+    <div className="grid flex-1 grid-cols-[minmax(max-content,0.88fr)_minmax(max-content,0.94fr)_minmax(max-content,0.96fr)_minmax(max-content,0.92fr)_minmax(max-content,1.3fr)] gap-[10px] max-[1180px]:grid-cols-3 max-[860px]:grid-cols-2">
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="violet"
+        icon={<GridIcon />}
+        label="Cells in scope"
+        value={String(shifts.length)}
+        detail={
+          <>
+            Category {String.fromCharCode(0xd7)} channel{" "}
+            {String.fromCharCode(0xd7)} region cells row level security
+            returned to you. A colleague on the same brand with a different
+            region sees a different number, and neither of them is the
+            portfolio&apos;s.
+            {unreadable > 0
+              ? ` ${unreadable} further row${
+                  unreadable === 1 ? "" : "s"
+                } reached this screen without a readable split and ${
+                  unreadable === 1 ? "is" : "are"
+                } left out rather than counted as zero.`
+              : ""}
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="green"
+        icon={<ArrowUpIcon />}
+        label="Shift in"
+        value={String(counts.shiftIn)}
+        pill={
+          counts.shiftIn > 0 ? (
+            <Pill variant="up">regions gaining</Pill>
+          ) : undefined
+        }
+        detail={
+          <>
+            Cells where the optimiser puts more of the category total into
+            this region than last year&apos;s mix would. The count is of
+            cells, not units: one large cell can outweigh several small ones,
+            which is what the shift pp column on the board is for.
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="red"
+        icon={<ArrowDownIcon />}
+        label="Shift out"
+        value={String(counts.shiftOut)}
+        pill={
+          counts.shiftOut > 0 ? (
+            <Pill variant="down">regions giving up</Pill>
+          ) : undefined
+        }
+        detail={
+          <>
+            Cells the optimiser takes share away from. Shifts in and shifts
+            out need not sum to the cells in scope: a region the model holds
+            at its current share is neither, and those are counted as holds.
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="violet"
+        icon={<UsersIcon />}
+        /* "Inside the band", not "Inside the agent band": an inline card's
+           label cannot wrap, so a five-word label sets a floor under the
+           card's width and pushes the strip onto a second line. This is the
+           wording the band card's own stat rail already uses, the tile says
+           whose band it is, and the pill beside the value names the ceiling. */
+        label="Inside the band"
+        value={String(counts.within)}
+        pill={
+          <Pill variant={ceilingPp === null ? "grey" : "violet"} tabular>
+            {ceilingPp === null ? "no band" : `under ${formatCeiling(ceilingPp)}`}
+          </Pill>
+        }
+        detail={
+          ceilingPp === null ? (
+            <>
+              No enabled allocation band is published for this brand, so
+              nothing here executes on its own and every movement on the board
+              is a decision waiting on a person.
+            </>
+          ) : (
+            <>
+              Movements the agent commits without asking, because the share
+              they move is strictly below the published ceiling. The remaining{" "}
+              {counts.escalates} escalate. This is not the threshold a
+              row&apos;s rationale quotes: that one decides whether the
+              optimiser calls a movement a shift at all, and this one decides
+              who is allowed to commit it.
+            </>
+          )
+        }
+        href="#agent-band"
+        hrefLabel="See how the band was derived"
+      />
+
+      {accuracy === null ? (
+        <KpiCard
+          variant="inline"
+          surface="plain"
+          tone="green"
+          icon={<TargetIcon />}
+          label="Forecast accuracy"
+          value="--"
+          detail="No accuracy row is readable in your scope, so nothing is claimed for the model that proposed these movements."
+        />
+      ) : (
+        <AccuracyStatement
+          accuracy={accuracy}
+          variant="card"
+          cardVariant="inline"
+          cardSurface="plain"
+          cardBasis
+          icon={<TargetIcon />}
+        />
+      )}
+    </div>
+  );
+
   return (
     <>
-      <PageHeader eyebrow={EYEBROW} title={TITLE} kpis={kpis}>
-        {accuracy ? (
-          <AccuracyStatement accuracy={accuracy} variant="inline" />
-        ) : null}
-      </PageHeader>
+      <PageHeader
+        eyebrow={EYEBROW}
+        title={TITLE}
+        tagline="Optimize today. Serve tomorrow."
+        band={headerCards}
+      />
 
       {band ? (
         <Banner
           variant="violet"
-          icon="i"
+          icon={<BulbIcon />}
+          eyebrow="Key insight"
           title="The band the agent acts inside was derived, not chosen."
           measureCh={100}
+          /*
+            Closed by default. The title is the whole claim, so a reader who
+            never opens this has still read it; the sixty words under it are
+            the evidence, and they were standing between the header figures
+            and the board every single visit. They open on a press and are
+            word for word what they were.
+          */
+          collapsible
+          /*
+            The aside states the CONSEQUENCE of the paragraph beside it, in
+            the four words a planner would use. It carries no figure on
+            purpose: every number that supports the claim is in the
+            derivation to its left, and a number lifted out of its derivation
+            and set in a decorative panel is exactly the pattern this app
+            spends the rest of its surface area avoiding.
+          */
+          aside={
+            <div className="w-[190px] text-right">
+              <span className="block text-orange">
+                <SettlingCurve />
+              </span>
+              <div className="mt-[2px] text-[12.5px] font-extrabold leading-[1.35] text-ink">
+                Smaller shifts.
+                <br />
+                Smarter outcomes.
+              </div>
+              <span
+                aria-hidden="true"
+                className="mt-[7px] ml-auto block h-[2px] w-[46px] rounded-pill bg-orange"
+              />
+            </div>
+          }
         >
           {band.acts_within}
         </Banner>
@@ -222,13 +422,9 @@ export default async function AllocationPage({ searchParams }: PageProps) {
           </CardBody>
         </Card>
       ) : (
-        <div className="grid grid-cols-[1.35fr_1fr] gap-[16px]">
+        <div className="grid grid-cols-[1.35fr_1fr] gap-[16px] max-[1240px]:grid-cols-1">
           <Card>
             <CardHeader
-              title={`${labels.categories[group.categoryId] ?? group.categoryId} ${MIDDOT} ${
-                labels.channels[group.channelId] ?? group.channelId
-              }`}
-              subtitle="Regional units, optimiser against the incumbent rule"
               actions={
                 <SeriesPicker
                   options={seriesOptions}
@@ -236,7 +432,26 @@ export default async function AllocationPage({ searchParams }: PageProps) {
                   path={ROUTE}
                 />
               }
-            />
+            >
+              <div className="flex min-w-0 items-center gap-[11px]">
+                <span
+                  aria-hidden="true"
+                  className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[13px] bg-peach text-orange"
+                >
+                  <GarmentIcon />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-h3 font-extrabold text-ink">
+                    {labels.categories[group.categoryId] ?? group.categoryId}{" "}
+                    {MIDDOT}{" "}
+                    {labels.channels[group.channelId] ?? group.channelId}
+                  </h3>
+                  <div className="mt-[2px] text-small font-semibold text-mute">
+                    Regional units, optimiser against the incumbent rule
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
             <CardBody>
               <ShiftBoard
                 group={group}
@@ -251,18 +466,21 @@ export default async function AllocationPage({ searchParams }: PageProps) {
                 them. The share movement is read from the recommendation rather
                 than recomputed here, because your scope may hold only part of
                 this cell and a share recomputed over part of a cell would be a
-                different number.
+                different number. Open a row for its reasoning, what the
+                movement is worth in units, and the decision.
               </p>
             </CardBody>
           </Card>
 
           <div className="flex flex-col gap-[16px]">
-            <AgentBandCard
-              band={band}
-              ceilingPp={ceilingPp}
-              counts={counts}
-              brandId={brandId}
-            />
+            <div id="agent-band" className="scroll-mt-[90px]">
+              <AgentBandCard
+                band={band}
+                ceilingPp={ceilingPp}
+                counts={counts}
+                brandId={brandId}
+              />
+            </div>
             <PortfolioMovement
               counts={counts}
               total={shifts.length}
@@ -308,6 +526,11 @@ export default async function AllocationPage({ searchParams }: PageProps) {
           }
         />
       ) : null}
+
+      <PageFooter
+        statement="Where the units go, and who decided"
+        words={["Insights", "Actions", "Impact"]}
+      />
     </>
   );
 }

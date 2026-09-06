@@ -85,11 +85,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // field null and the intro drops that half of the line rather than
   // asserting somebody else's job title or another brand's name.
   const welcomeRole =
-    identity.roles.find((row) => row.employee_id === planner.employeeId)?.role ??
-    null;
+    identity.roles.find((row) => row.employee_id === planner.employeeId)
+      ?.role ?? null;
   const welcomeCompany =
-    identity.brands.find((row) => row.brand_id === planner.brandId)?.brand_name ??
-    null;
+    identity.brands.find((row) => row.brand_id === planner.brandId)
+      ?.brand_name ?? null;
 
   // NO SIGN-OUT SERVER ACTION HERE, DELIBERATELY.
   //
@@ -107,6 +107,19 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           company={welcomeCompany}
         />
       ) : null}
+      {/*
+        The skip link, first in the DOM and visible only on focus.
+        Every screen in this segment puts fourteen nav tabs, a copilot button
+        and an identity chip in front of its content. A keyboard reader had to
+        walk all of them on every navigation to reach the queue they came for.
+      */}
+      <a
+        href="#main-content"
+        className="sr-only rounded-pill bg-ink px-[16px] py-[9px] text-[12px] font-bold text-white focus:not-sr-only focus:absolute focus:left-[24px] focus:top-[16px] focus:z-50"
+      >
+        Skip to the content
+      </a>
+
       <div className="mx-auto min-w-[1140px] max-w-[1400px] px-[20px] pb-[44px] pt-[16px] max-[1140px]:min-w-0">
         <TopNav
           exceptionCount={exceptionCount}
@@ -115,7 +128,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             role: planner.appRole ?? undefined,
           }}
         />
-        {children}
+        <main id="main-content" tabIndex={-1}>
+          {children}
+        </main>
       </div>
     </CopilotProvider>
   );

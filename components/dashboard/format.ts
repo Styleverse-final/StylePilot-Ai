@@ -101,6 +101,18 @@ export function formatDay(iso: string | null | undefined): string | null {
   }).format(at);
 }
 
+/** "5 Sep 2026", for a label with no room for the month spelled out. */
+export function formatDayShort(iso: string | null | undefined): string | null {
+  const at = toDate(iso);
+  if (!at) return null;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: iso && iso.length <= 10 ? "UTC" : IST,
+  }).format(at);
+}
+
 /** "3 Sep 2026, 17:11" in IST. Instants format in the planner's zone. */
 export function formatStamp(iso: string | null | undefined): string | null {
   const at = toDate(iso);

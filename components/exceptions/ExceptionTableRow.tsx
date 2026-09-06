@@ -25,10 +25,15 @@ import type { CommittedDecisionStatus } from "@/lib/queries";
  * you cannot tell whether the eleventh item matters more than the second
  * without scrolling past ten.
  *
- * Collapsed, this row is a single line: severity, series, action, value,
+ * Collapsed, this row is a single line: rank, severity, series, action, value,
  * cover against its threshold, and the FIRST CLAUSE of the rationale. That is
  * enough to triage. Everything the card showed is still here, one click away,
  * and nothing was deleted to make room.
+ *
+ * THE RANK IS THE ARGUMENT OF THE SCREEN, so it is printed rather than left to
+ * be counted off the scrollbar. It is a position in the list as currently
+ * ordered and filtered -- not an identifier and not a severity grade -- which
+ * is why the queue derives it on every render instead of the row carrying it.
  *
  * THE DECISION CONTROLS MOVED INTO THE EXPANSION ON PURPOSE. Committing a buy
  * or dismissing a risk is not a thing to do while skimming, and putting an
@@ -38,6 +43,7 @@ import type { CommittedDecisionStatus } from "@/lib/queries";
  */
 
 const MIDDOT = String.fromCharCode(0x00b7);
+const ARROW = String.fromCharCode(0x2192);
 
 const STATUS_VARIANT: Record<CommittedDecisionStatus, PillVariant> = {
   APPROVED: "up",
@@ -74,9 +80,22 @@ function firstClause(text: string): { head: string; rest: string } {
   return { head: text, rest: "" };
 }
 
-export type ExceptionTableRowProps = { row: ExceptionView };
+/**
+ * Two digits to 99, then as many as the number needs. The padding holds the
+ * column on one width for a queue of the size a queue usually is; it never
+ * truncates, so a hundredth row still reads as the hundredth.
+ */
+function formatRank(rank: number): string {
+  return rank < 10 ? `0${rank}` : String(rank);
+}
 
-export function ExceptionTableRow({ row }: ExceptionTableRowProps) {
+export type ExceptionTableRowProps = {
+  row: ExceptionView;
+  /** 1-based position in the list as currently ordered and filtered. */
+  rank: number;
+};
+
+export function ExceptionTableRow({ row, rank }: ExceptionTableRowProps) {
   const [open, setOpen] = useState(false);
 
   const severityClass =
@@ -91,29 +110,40 @@ export function ExceptionTableRow({ row }: ExceptionTableRowProps) {
   return (
     <>
       <tr
-        className="border-b border-rule align-middle hover:bg-shell transition-colors duration-[120ms]"
+        className={`border-b border-rule align-middle transition-colors duration-[120ms] ${
+          open ? "bg-shell" : "hover:bg-shell"
+        }`}
         data-exception-row=""
       >
-        <td className="py-[7px] pr-[8px] pl-[14px] w-[10px]">
-          <span
-            aria-hidden="true"
-            className={`block h-[8px] w-[8px] rounded-full ${severityClass}`}
-          />
-          <span className="sr-only">
-            {row.severity === null ? "Severity not stated" : `Severity ${row.severity}`}
+        <td className="py-[9px] pl-[18px] pr-[10px] whitespace-nowrap text-small font-extrabold tabular text-mute">
+          {formatRank(rank)}
+        </td>
+
+        <td className="py-[9px] pr-[12px] whitespace-nowrap text-copy font-extrabold text-ink">
+          <span className="flex items-center gap-[9px]">
+            <span
+              aria-hidden="true"
+              className={`block h-[8px] w-[8px] flex-none rounded-full ${severityClass}`}
+            />
+            <span className="sr-only">
+              {row.severity === null
+                ? "Severity not stated"
+                : `Severity ${row.severity}`}
+            </span>
+            <span>
+              {row.category}
+              <span className="font-semibold text-mute"> {MIDDOT} </span>
+              {row.channel}
+              <span className="font-semibold text-mute"> {MIDDOT} </span>
+              {row.region}
+            </span>
           </span>
         </td>
 
-        <td className="py-[7px] pr-[10px] whitespace-nowrap text-copy font-extrabold text-ink">
-          {row.category}
-          <span className="font-semibold text-mute"> {MIDDOT} </span>
-          {row.channel}
-          <span className="font-semibold text-mute"> {MIDDOT} </span>
-          {row.region}
-        </td>
-
-        <td className="py-[7px] pr-[10px] whitespace-nowrap">
-          <Pill variant={row.isStockout ? "down" : "amber"}>{row.actionLabel}</Pill>
+        <td className="py-[9px] pr-[12px] whitespace-nowrap">
+          <Pill variant={row.isStockout ? "down" : "amber"}>
+            {row.actionLabel}
+          </Pill>
           {row.status === null ? null : (
             <span className="ml-[5px]">
               <Pill variant={STATUS_VARIANT[row.status]}>
@@ -123,11 +153,11 @@ export function ExceptionTableRow({ row }: ExceptionTableRowProps) {
           )}
         </td>
 
-        <td className="py-[7px] pr-[10px] whitespace-nowrap text-right text-copy font-extrabold text-ink tabular">
+        <td className="py-[9px] pr-[12px] whitespace-nowrap text-right text-base font-extrabold text-ink tabular">
           {formatInr(row.valueAtStakeInr)}
         </td>
 
-        <td className="py-[7px] pr-[10px] whitespace-nowrap text-right text-copy text-body tabular">
+        <td className="py-[9px] pr-[12px] whitespace-nowrap text-right text-copy text-body tabular">
           {formatWeeks(row.projectedWos)}
           {row.threshold === null ? null : (
             <span className="text-mute">
@@ -137,25 +167,33 @@ export function ExceptionTableRow({ row }: ExceptionTableRowProps) {
           )}
         </td>
 
-        <td className="py-[7px] pr-[10px] text-small text-body leading-[1.4]">
+        <td className="py-[9px] pr-[12px] text-small text-body leading-[1.4]">
           <span className="line-clamp-1">{clause ? clause.head : ""}</span>
         </td>
 
-        <td className="py-[7px] pr-[14px] whitespace-nowrap text-right">
+        <td className="py-[9px] pr-[18px] whitespace-nowrap text-right">
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
-            className="rounded-pill bg-cream px-[9px] py-[2px] text-[10.5px] font-extrabold text-body transition-colors duration-[120ms] hover:bg-peach"
+            className="inline-flex items-center gap-[6px] rounded-pill bg-cream px-[11px] py-[4px] text-[10.5px] font-extrabold text-body transition-colors duration-[120ms] hover:bg-peach hover:text-orangeD"
           >
             {open ? "close" : row.status === null ? "decide" : "detail"}
+            <span
+              aria-hidden="true"
+              className={`text-[11px] leading-none transition-transform duration-[120ms]${
+                open ? " rotate-90" : ""
+              }`}
+            >
+              {ARROW}
+            </span>
           </button>
         </td>
       </tr>
 
       {open ? (
         <tr className="border-b border-rule bg-shell">
-          <td colSpan={7} className="px-[14px] py-[13px]">
+          <td colSpan={7} className="px-[18px] py-[13px]">
             {row.rationale === null ? null : (
               <p className="max-w-[92ch] text-copy leading-[1.6] text-body">
                 {row.rationale}

@@ -12,8 +12,14 @@ export {
   PORTFOLIO_PRIMARY_NAV,
   PORTFOLIO_ROLES,
   navFor,
+  isActive,
 } from "./navItems";
 export type { TopNavProps, NavItem, NavUser } from "./TopNav";
+
+export { default as NavSheet } from "./NavSheet";
+export type { NavSheetProps } from "./NavSheet";
+
+export { iconFor as navIconFor, ChevronIcon, MenuIcon, CloseIcon } from "./navIcons";
 
 export {
   CopilotDrawer,
@@ -37,6 +43,28 @@ export type { CardProps, CardHeaderProps, CardBodyProps } from "./Card";
 export { KpiRow, Kpi } from "./KpiRow";
 export type { KpiRowProps, KpiProps } from "./KpiRow";
 
+export { KpiCard } from "./KpiCard";
+export type {
+  KpiCardProps,
+  KpiTone,
+  KpiCardVariant,
+  KpiCardSurface,
+  KpiCardDensity,
+} from "./KpiCard";
+
+export { default as PageFooter } from "./PageFooter";
+export type { PageFooterProps } from "./PageFooter";
+
+export { Sparkline, Bars, Track, SplitBar } from "./Marks";
+export type {
+  SparklineProps,
+  BarsProps,
+  TrackProps,
+  TrackTick,
+  SplitBarProps,
+  SplitSegment,
+} from "./Marks";
+
 export { Pill } from "./Pill";
 export type { PillProps, PillVariant } from "./Pill";
 
@@ -56,6 +84,8 @@ export type {
   DataTableProps,
   Column,
   ColumnAlign,
+  CellAlign,
+  SortDirection,
   SeriesNameProps,
 } from "./DataTable";
 

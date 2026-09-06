@@ -34,6 +34,11 @@
 @layer base {
   html {
     height: 100%;
+    /* A header KPI links to the panel that explains it. Animating the jump
+       shows the reader they moved down the same screen rather than landing
+       on a new one; the reduced-motion block at the foot of this file forces
+       it back to auto. */
+    scroll-behavior: smooth;
   }
 
   body {

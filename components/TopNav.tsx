@@ -1,26 +1,60 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  // Aliased: the DOM's own KeyboardEvent is used by the document-level
+  // listeners below, and React's synthetic one by the menu handler. Same
+  // name, different types, and shadowing one with the other is how a handler
+  // ends up compiling against the wrong shape.
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { SPARK, useCopilot } from "./CopilotDrawer";
+import { NavSheet } from "./NavSheet";
 import { UserChip } from "./UserChip";
+import { ChevronIcon, iconFor } from "./navIcons";
 // Re-exported below for client consumers; imported here because this
 // component uses them itself.
-import { navFor, type NavItem } from "./navItems";
+import { isActive, navFor, type NavItem } from "./navItems";
 
 /**
  * TopNav
  *
- * Ports `.topnav`, `.logo`, `.tabs`, `.tab`, `.divider`, `.pip`, `.navr`
- * and `.iconb`. A sticky white pill bar: wordmark left, fourteen tabs
- * centred with a hairline divider between the eight primary and six
- * secondary routes, copilot trigger and account chip right.
+ * A sticky white pill bar: wordmark left, the role's tabs centred with a
+ * hairline divider between the tiers, then the copilot trigger and account
+ * chip right.
  *
- * Active state comes from usePathname(), not from props, so a tab lights
- * up on navigation without any page having to declare which one it is.
+ * Active state comes from usePathname(), not from props, so a tab lights up
+ * on navigation without any page having to declare which one it is.
+ *
+ * ONE ACTIVE LANGUAGE, NOT TWO
+ * ----------------------------
+ * A primary tab used to go solid ink and a secondary tab solid violet. Two
+ * filled states in one 30px bar is two things to learn, and neither of them
+ * says "you are here" better than the other -- the colour was carrying TIER,
+ * which the reader can already see from the divider and the weight, while the
+ * thing it looked like it was carrying was position. Worse, both fills are
+ * heavy enough to become the loudest object in the bar, so the eye lands on
+ * whichever tab is active before it lands on the wordmark or the queue pip.
+ *
+ * Now there is one: a cream ground, ink text, and a 2px orange bar under the
+ * label. The bar is the same mark PageFooter uses to open and close a screen,
+ * so "orange rule" already means "this is the edge of the thing you are
+ * reading" everywhere else in the app. Tier survives in the type weight and
+ * the divider, which is what those two were for.
+ *
+ * The icons are the second half of that trade. Losing the fills costs some
+ * scannability, and a glyph beside each label buys it back in a way that
+ * works for a reader coming back to a tab they use every day -- shape is
+ * faster than reading, and unlike colour it is still there when the tab is
+ * idle.
  */
 
 /**
@@ -43,20 +77,28 @@ export {
 const CHROMELESS_ROUTES: readonly string[] = ["/login"];
 
 const TAB_BASE =
-  "rounded-pill px-[11px] py-[7px] text-nav whitespace-nowrap transition-colors duration-[120ms]";
+  "relative inline-flex items-center gap-[6px] rounded-pill px-[10px] py-[7px] text-nav whitespace-nowrap transition-colors duration-[120ms]";
 
 const TAB_TONE = {
-  primaryIdle: "font-bold text-body hover:bg-cream",
-  primaryActive: "font-bold bg-ink text-white hover:bg-ink",
-  secondaryIdle: "font-semibold text-mute hover:bg-cream",
-  secondaryActive: "font-semibold bg-violet text-white hover:bg-violet",
+  primaryIdle: "font-bold text-body hover:bg-cream hover:text-ink",
+  primaryActive: "font-bold bg-cream text-ink",
+  secondaryIdle: "font-semibold text-mute hover:bg-cream hover:text-body",
+  secondaryActive: "font-semibold bg-cream text-ink",
 } as const;
 
+/**
+ * The active mark: the same 2px orange rule PageFooter opens and closes a
+ * screen with. Sits inside the tab's bottom padding, so it never moves the
+ * label or changes the bar's height between states -- a marker that reflows
+ * its own tab makes the whole row shift by a pixel on every navigation.
+ */
+const TAB_MARK =
+  "absolute bottom-[3px] left-1/2 h-[2px] w-[14px] -translate-x-1/2 rounded-pill bg-orange";
+
 const PIP_BASE =
-  "ml-[5px] inline-block min-w-[16px] rounded-pill px-[4px] text-center text-[10px] font-extrabold tabular-nums";
+  "inline-block min-w-[16px] rounded-pill px-[4px] text-center text-[10px] font-extrabold tabular-nums";
 
 const PIP_HREF = "/exceptions";
-const CHEVRON = String.fromCharCode(0x25be); // black down-pointing small triangle
 
 export type NavUser = {
   name?: string;
@@ -69,11 +111,6 @@ export type TopNavProps = {
   /** Signed-in user. Supplied by whoever wires the session. */
   user?: NavUser | null;
 };
-
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
 
 /**
  * PREFETCH ON INTENT, NOT ON ARRIVAL.
@@ -237,13 +274,58 @@ function useWarmPrimary(primary: readonly NavItem[], pathname: string) {
   }, [primary, pathname, router]);
 }
 
+/**
+ * Which popover is open, if any.
+ *
+ * ONE VALUE, NOT TWO BOOLEANS. The bar has two dropdowns -- More and the
+ * account chip -- and they used to own their own open state independently.
+ * Nothing stopped both being true, and clicking one while the other was open
+ * did exactly that: two cards hanging off the same bar, overlapping, neither
+ * of them stale enough to look deliberate. A union cannot represent that
+ * state, so the bug is not fixed here so much as made unspeakable.
+ */
+type Popover = "more" | "account" | null;
+
 export function TopNav({ exceptionCount, user }: TopNavProps) {
   const prefetchOnce = usePrefetchOnce();
   const { primary, secondary, more } = navFor(user?.role);
-  const [moreOpen, setMoreOpen] = useState(false);
+  // Stored WITH the route it was opened on, so closing on navigation is a
+  // comparison rather than a second render -- see the same reasoning, at
+  // length, in NavSheet. Following a link in the More menu changes pathname,
+  // `at` stops matching, and the menu is shut without an effect resetting it.
+  const [popoverState, setPopoverState] = useState<{
+    which: Popover;
+    at: string;
+  } | null>(null);
   const moreRef = useRef<HTMLDivElement>(null);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuId = useId();
   const pathname = usePathname();
-  const { open } = useCopilot();
+  const { open: openCopilot } = useCopilot();
+
+  const popover: Popover =
+    popoverState && popoverState.at === pathname ? popoverState.which : null;
+  // useCallback so the two effects below can name it as a dependency honestly
+  // rather than lying about one. A fresh closure per render would re-run both
+  // of them on every render, re-attaching their document listeners each time.
+  const setPopover = useCallback(
+    (which: Popover) =>
+      setPopoverState(which ? { which, at: pathname } : null),
+    [pathname],
+  );
+
+  const moreOpen = popover === "more";
+
+  // Stable, because UserChip memoises its own setter against this and an
+  // inline arrow here would change identity every render -- which would make
+  // that setter change every render, and re-attach the chip's two document
+  // listeners every render while its menu is open.
+  const onAccountOpenChange = useCallback(
+    (next: boolean) => setPopover(next ? "account" : null),
+    [setPopover],
+  );
+  const closeAllPopovers = useCallback(() => setPopover(null), [setPopover]);
 
   // Called BEFORE the early return below. There is already one useEffect
   // after that return, which is a hooks-order violation that only survives
@@ -265,12 +347,35 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
     if (!moreOpen) return;
     const onDown = (event: MouseEvent) => {
       if (moreRef.current && !moreRef.current.contains(event.target as Node)) {
-        setMoreOpen(false);
+        setPopover(null);
       }
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [moreOpen]);
+  }, [moreOpen, setPopover]);
+
+  // ESCAPE, AND FOCUS THAT COMES BACK.
+  //
+  // The menu closed on an outside click and on nothing else. A keyboard
+  // reader who opened it had two ways out -- Tab through every item to the
+  // end, or click -- and neither is Escape, which is the one they will try.
+  // UserChip has handled Escape since it was written; this had not, so the
+  // two dropdowns on the same bar behaved differently.
+  //
+  // Focus returns to the trigger because the node holding it is the one about
+  // to be unmounted. Left alone, focus falls to <body> and the next Tab
+  // restarts at the skip link, which is a long way back from where they were.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPopover(null);
+        moreTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [moreOpen, setPopover]);
 
   if (CHROMELESS_ROUTES.includes(pathname)) return null;
 
@@ -291,6 +396,8 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
       typeof exceptionCount === "number" &&
       exceptionCount > 0;
 
+    const glyph = iconFor(item.href);
+
     return (
       <Link
         key={item.href}
@@ -301,6 +408,9 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
         className={`${TAB_BASE} ${tone}`}
         aria-current={active ? "page" : undefined}
       >
+        {glyph ? (
+          <span className={active ? "text-orange" : "text-mute"}>{glyph}</span>
+        ) : null}
         {item.label}
         {showPip ? (
           <span
@@ -309,10 +419,57 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
             }`}
           >
             {exceptionCount}
+            {/*
+              The count on its own was announced as part of the label -- the
+              tab read "Exceptions 66", a number with no unit, which is either
+              sixty-six exceptions or the sixty-sixth of something. The pip is
+              visual shorthand that works because it sits on a tab already
+              labelled Exceptions; a screen reader gets that context spelled
+              out instead.
+            */}
+            <span className="sr-only"> open exceptions</span>
           </span>
         ) : null}
+        {active ? <span aria-hidden="true" className={TAB_MARK} /> : null}
       </Link>
     );
+  };
+
+  /**
+   * ARROW KEYS INSIDE THE MORE MENU.
+   *
+   * The menu carries role="menu" and its items role="menuitem", which is a
+   * promise: a reader who meets that role expects arrows to move between
+   * items and Home/End to reach the ends, because that is what the role
+   * means. It was making the promise and only supporting Tab.
+   *
+   * Read off the DOM rather than tracked in state. The alternative is an
+   * active-index state that has to be kept in step with a list that is
+   * already derived from the role's nav -- two sources for one fact, and the
+   * DOM is the one that is definitionally correct about what is rendered.
+   */
+  const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    const items = Array.from(
+      moreMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ??
+        [],
+    );
+    if (items.length === 0) return;
+    event.preventDefault();
+
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? items.length - 1
+          : event.key === "ArrowDown"
+            ? // -1 (focus is on none of them) + 1 lands on the first item,
+              // which is what a reader arrowing in from the trigger wants.
+              (current + 1) % items.length
+            : (current - 1 + items.length) % items.length;
+    items[next]?.focus();
   };
 
   return (
@@ -346,16 +503,28 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
 
         {/*
           MORE. Evidence and governance live behind one door rather than
-          competing with Buy for the same row. The trigger lights violet when
-          a route inside it is active, so a reader on /governance can still
-          see where they are without the menu being open.
+          competing with Buy for the same row. The trigger carries the active
+          marker when a route inside it is active, so a reader on /governance
+          can still see where they are without the menu being open -- the same
+          orange rule a tab uses, because it means the same thing.
         */}
         <div className="relative" ref={moreRef}>
           <button
+            ref={moreTriggerRef}
             type="button"
-            onClick={() => setMoreOpen((open) => !open)}
+            onClick={() => setPopover(moreOpen ? null : "more")}
+            onKeyDown={(event) => {
+              // Arrow-down opens the menu and lands on its first item, which
+              // is the gesture a reader who knows the pattern will reach for
+              // before they try Enter.
+              if (event.key === "ArrowDown" && !moreOpen) {
+                event.preventDefault();
+                setPopover("more");
+              }
+            }}
             aria-expanded={moreOpen}
             aria-haspopup="menu"
+            aria-controls={moreOpen ? moreMenuId : undefined}
             className={`${TAB_BASE} ${
               moreActive
                 ? TAB_TONE.secondaryActive
@@ -363,31 +532,53 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
             }`}
           >
             More
-            <span aria-hidden="true" className="ml-[4px] text-[9px]">
-              {CHEVRON}
-            </span>
+            <ChevronIcon
+              className={`transition-transform duration-[120ms] ${
+                moreOpen ? "rotate-180" : ""
+              }`}
+            />
+            {moreActive ? (
+              <span aria-hidden="true" className={TAB_MARK} />
+            ) : null}
           </button>
 
           {moreOpen ? (
             <div
+              id={moreMenuId}
+              ref={moreMenuRef}
               role="menu"
-              className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-[190px] rounded-card border border-rule bg-white py-[6px] shadow-drawer"
+              aria-label="More"
+              onKeyDown={onMenuKeyDown}
+              className="absolute right-0 top-[calc(100%+8px)] z-50 min-w-[200px] rounded-card border border-rule bg-white py-[6px] shadow-drawer"
             >
               {more.map((item) => {
                 const active = isActive(pathname, item.href);
+                const glyph = iconFor(item.href);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     role="menuitem"
-                    onClick={() => setMoreOpen(false)}
-                    className={`block px-[14px] py-[8px] text-nav transition-colors duration-[120ms] ${
+                    onMouseEnter={() => prefetchOnce(item.href)}
+                    onFocus={() => prefetchOnce(item.href)}
+                    onClick={() => setPopover(null)}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex items-center gap-[10px] px-[14px] py-[8px] text-nav transition-colors duration-[120ms] ${
                       active
-                        ? "font-bold bg-violetW text-violet"
+                        ? "font-extrabold bg-cream text-ink"
                         : "font-semibold text-body hover:bg-cream"
                     }`}
                   >
-                    {item.label}
+                    <span className={active ? "text-orange" : "text-mute"}>
+                      {glyph}
+                    </span>
+                    <span className="flex-1">{item.label}</span>
+                    {active ? (
+                      <span
+                        aria-hidden="true"
+                        className="h-[14px] w-[2px] rounded-pill bg-orange"
+                      />
+                    ) : null}
                   </Link>
                 );
               })}
@@ -396,16 +587,33 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
         </div>
       </nav>
 
+      {/* Pushes the right-hand cluster over when the tab row is absent. The
+          row itself carries mx-auto, which does that job at full width; below
+          1140px there is no row to do it. */}
+      <span className="ml-auto min-[1141px]:hidden" aria-hidden="true" />
+
       <div className="flex items-center gap-[8px]">
+        <NavSheet
+          primary={primary}
+          secondary={secondary}
+          more={more}
+          exceptionCount={exceptionCount}
+          onOpen={closeAllPopovers}
+        />
         <button
           type="button"
-          onClick={open}
+          onClick={openCopilot}
           aria-label="Open copilot"
           className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-cream text-[13px] text-ink transition-colors duration-[120ms] hover:bg-hover"
         >
           {SPARK}
         </button>
-        <UserChip name={user?.name} role={user?.role} />
+        <UserChip
+          name={user?.name}
+          role={user?.role}
+          open={popover === "account"}
+          onOpenChange={onAccountOpenChange}
+        />
       </div>
     </header>
   );

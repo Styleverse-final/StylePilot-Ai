@@ -3,12 +3,20 @@ import Link from "next/link";
 
 import {
   AccuracyStatement,
+  KpiCard,
   ModelStrip,
+  PageFooter,
   PageHeader,
-  type KpiItem,
+  Pill,
   type ModelConfidence,
 } from "@/components";
 import { ExceptionQueue } from "@/components/exceptions/ExceptionQueue";
+import {
+  AlertTriangleIcon,
+  BoxIcon,
+  ClockIcon,
+  LayersIcon,
+} from "@/components/exceptions/icons";
 import { ThresholdBanner } from "@/components/exceptions/ThresholdBanner";
 import { TouchlessBanner } from "@/components/exceptions/TouchlessBanner";
 import { formatCount, formatInr } from "@/components/exceptions/format";
@@ -339,6 +347,7 @@ export default async function ExceptionsPage({
   const stockout = views.filter((v) => v.isStockout);
   const overstock = views.filter((v) => !v.isStockout);
   const undecided = views.filter((v) => v.status === null).length;
+  const highPriority = views.filter((v) => v.severity === "HIGH").length;
 
   // ?status=open -- the exceptions carrying no decision row.
   //
@@ -357,27 +366,6 @@ export default async function ExceptionsPage({
   const queue = filterOpen ? views.filter((v) => v.status === null) : views;
   const sumValue = (list: readonly ExceptionView[]): number =>
     list.reduce((total, view) => total + (view.valueAtStakeInr ?? 0), 0);
-
-  const kpis: KpiItem[] = [
-    {
-      label: "Stockout risk",
-      value: formatCount(stockout.length),
-      pill: formatInr(sumValue(stockout)),
-      tone: "down",
-    },
-    {
-      label: "Overstock risk",
-      value: formatCount(overstock.length),
-      pill: formatInr(sumValue(overstock)),
-      tone: "amber",
-    },
-    {
-      label: "Awaiting your decision",
-      value: formatCount(undecided),
-      pill: `of ${formatCount(views.length)}`,
-      tone: "grey",
-    },
-  ];
 
   const versions = Array.from(
     new Set(
@@ -399,11 +387,120 @@ export default async function ExceptionsPage({
 
   return (
     <>
+      {/*
+        THE FOUR HEADER CARDS ARE THE SHAPE OF THE QUEUE, NOT A SCORECARD.
+        Two of them split the list by what went wrong, one says how much of it
+        is still on the reader, and the fourth says how much of it the pipeline
+        graded as urgent. Every one is counted off `views` -- the rows this
+        session may actually read -- so a planner scoped to one region sees
+        their own four numbers rather than a portfolio total they cannot act
+        on. The money beside a count is the sum of value at stake over exactly
+        the rows that count covers, and a row carrying no value figure adds
+        nothing to it rather than a zero.
+      */}
       <PageHeader
         eyebrow="Exception-based planning"
         title="Exceptions"
-        kpis={kpis}
-      />
+        strapline={
+          <span className="text-copy font-semibold normal-case tracking-normal text-body">
+            Focus where it matters. Resolve. Move forward.
+          </span>
+        }
+        aside={
+          <span className="text-small font-semibold text-mute max-[1240px]:hidden">
+            Ranked by value at stake
+          </span>
+        }
+      >
+        <div className="grid min-w-[600px] flex-1 grid-cols-4 gap-[10px] max-[1240px]:grid-cols-2">
+          <KpiCard
+            variant="inline"
+            tone="neutral"
+            icon={<BoxIcon />}
+            label="Stockout risk"
+            value={formatCount(stockout.length)}
+            pill={
+              stockout.length === 0 ? undefined : (
+                <Pill variant="orange" tabular>
+                  {formatInr(sumValue(stockout))}
+                </Pill>
+              )
+            }
+            detail={
+              <span className="block">
+                Raised against the category&apos;s stockout floor: projected
+                cover falls below it, or recent availability was low enough
+                that the series sold short of demand while demand was still
+                rising. The figure beside the count is the value at stake
+                summed over those rows alone.
+              </span>
+            }
+          />
+
+          <KpiCard
+            variant="inline"
+            tone="neutral"
+            icon={<AlertTriangleIcon />}
+            label="Overstock risk"
+            value={formatCount(overstock.length)}
+            pill={
+              overstock.length === 0 ? undefined : (
+                <Pill variant="orange" tabular>
+                  {formatInr(sumValue(overstock))}
+                </Pill>
+              )
+            }
+            detail={
+              <span className="block">
+                Raised against the category&apos;s cover ceiling: eight-week
+                demand against latest closing inventory puts projected weeks of
+                cover above the ceiling. The ceilings and how each was derived
+                are set out under the queue.
+              </span>
+            }
+          />
+
+          <KpiCard
+            variant="inline"
+            tone="neutral"
+            icon={<ClockIcon />}
+            label="Awaiting your decision"
+            value={formatCount(undecided)}
+            pill={
+              <Pill variant="grey" tabular>
+                of {formatCount(views.length)}
+              </Pill>
+            }
+            detail={
+              <span className="block">
+                Undecided means no decision row exists against the
+                recommendation -- not a status value. The decision log is
+                append-only, so a row leaves this count once, and a change of
+                mind later is a new entry beside the first rather than an edit
+                to it.
+              </span>
+            }
+          />
+
+          <KpiCard
+            variant="inline"
+            tone="neutral"
+            icon={<LayersIcon />}
+            label="High priority"
+            value={formatCount(highPriority)}
+            pill={<Pill variant="grey">requires action</Pill>}
+            detail={
+              <span className="block">
+                Severity is the pipeline&apos;s own grading, stored on the
+                recommendation and printed here unchanged; nothing on this
+                screen re-grades a row. It is not the same cut as the money
+                ranking, which is why both are on screen: a high-severity row
+                can sit well down a list ordered by value at stake.
+              </span>
+            }
+          />
+        </div>
+      </PageHeader>
 
       {/*
         THE BANNERS MOVED BELOW THE QUEUE.
@@ -482,6 +579,11 @@ export default async function ExceptionsPage({
           }
         />
       )}
+
+      <PageFooter
+        statement="Exceptions today. A stronger tomorrow."
+        words={["Plan smarter", "Act faster", "Create value"]}
+      />
     </>
   );
 }

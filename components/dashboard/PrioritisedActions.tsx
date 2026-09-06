@@ -1,10 +1,19 @@
 import Link from "next/link";
 
-import { Card, CardBody, CardHeader, DataTable, Pill, SeriesName } from "@/components";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  DataTable,
+  Pill,
+  SeriesName,
+} from "@/components";
 import type { Column } from "@/components";
 import type { RecType, RecommendationState } from "@/lib/queries";
 
 import { formatCount, formatCrore, humanise, seriesLabel } from "./format";
+import { QueueApprove } from "./QueueApprove";
+import { RowLimit } from "./RowLimit";
 
 /**
  * PrioritisedActions -- block 4.
@@ -16,7 +25,17 @@ import { formatCount, formatCrore, humanise, seriesLabel } from "./format";
  * rupees) sort last rather than being dropped, because dropping them would
  * quietly shrink the queue.
  *
- * Every row deep-links to the screen that can actually settle it.
+ * Every row deep-links to the screen that can actually settle it, and every
+ * row can be approved without going there. See <QueueApprove> for why approve
+ * is the only decision this screen takes: it is the only one the server
+ * accepts without a written reason, and a reason needs the room the owning
+ * screen has.
+ *
+ * THE FILTER IS A LINK, NOT A TOGGLE. The queue is mixed -- buy, allocation
+ * and exception rows in one ranking -- and a planner clearing buys wants only
+ * buys. Filtering in the browser would filter the twelve rows on screen out
+ * of ninety-three, which is a different and much less useful thing, so the
+ * chips are links that re-rank the whole queue on the server.
  */
 
 /** Where each recommendation type is decided. */
@@ -48,13 +67,43 @@ function severityTone(severity: string | null): "down" | "amber" | "grey" {
   return "grey";
 }
 
+/** The chips above the table, in the order the queue is usually worked. */
+const FILTERS: ReadonlyArray<{ label: string; type: RecType | null }> = [
+  { label: "Everything", type: null },
+  { label: "Exceptions", type: "EXCEPTION" },
+  { label: "Buy", type: "BUY_QUANTITY" },
+  { label: "Allocation", type: "ALLOCATION" },
+];
+
+const CHIP =
+  "rounded-pill px-[12px] py-[6px] text-[11.5px] font-bold transition-colors duration-[120ms]";
+
+/**
+ * How many rows stand open before the reader asks for the rest.
+ *
+ * The card fetches and renders more than this -- see ACTION_ROWS on the page
+ * -- and <RowLimit> hides the overflow behind one button. Four is enough to
+ * show what the top of the ranking looks like without a summary screen giving
+ * half its height to a list the reader has not asked to work yet.
+ */
+const VISIBLE_ROWS = 4;
+
 export type PrioritisedActionsProps = {
   rows: readonly RecommendationState[];
   /** How many open rows exist in scope in total, before the cut. */
   openTotal: number;
+  /** The rec_type currently filtered to, or null for the whole queue. */
+  activeType?: RecType | null;
+  /** Open rows per type across the whole scope, for the chip counts. */
+  countsByType?: Readonly<Record<string, number>>;
 };
 
-export function PrioritisedActions({ rows, openTotal }: PrioritisedActionsProps) {
+export function PrioritisedActions({
+  rows,
+  openTotal,
+  activeType = null,
+  countsByType,
+}: PrioritisedActionsProps) {
   const columns: ReadonlyArray<Column<RecommendationState>> = [
     {
       key: "series",
@@ -96,7 +145,22 @@ export function PrioritisedActions({ rows, openTotal }: PrioritisedActionsProps)
         row.value_at_stake_inr === null ? (
           <span className="text-mute">not priced</span>
         ) : (
-          <b className="font-extrabold">{formatCrore(row.value_at_stake_inr)}</b>
+          <b className="font-extrabold">
+            {formatCrore(row.value_at_stake_inr)}
+          </b>
+        ),
+    },
+    {
+      key: "decide",
+      header: "Decide",
+      align: "right",
+      headerClassName: "w-[150px]",
+      cell: (row) =>
+        row.id === null ? null : (
+          <QueueApprove
+            recommendationId={row.id}
+            rowLabel={`${humanise(row.action)} on ${seriesLabel(row.series_key)}`}
+          />
         ),
     },
     {
@@ -119,7 +183,7 @@ export function PrioritisedActions({ rows, openTotal }: PrioritisedActionsProps)
     <Card>
       <CardHeader
         title="Prioritised actions"
-        subtitle="Ranked by value at stake. Each row opens where it can be settled."
+        subtitle="Ranked by value at stake. Approve here, or open the screen that owns the rest of the decision."
         actions={
           openTotal > rows.length ? (
             <span className="rounded-pill bg-cream px-[12px] py-[5px] text-[11.5px] font-semibold text-body">
@@ -128,22 +192,52 @@ export function PrioritisedActions({ rows, openTotal }: PrioritisedActionsProps)
           ) : undefined
         }
       />
+
+      <div className="flex flex-wrap items-center gap-[7px] border-b border-rule px-[20px] py-[11px]">
+        {FILTERS.map((filter) => {
+          const isActive = filter.type === activeType;
+          const count =
+            filter.type === null ? undefined : countsByType?.[filter.type];
+          return (
+            <Link
+              key={filter.label}
+              href={filter.type === null ? "/" : `/?type=${filter.type}`}
+              scroll={false}
+              aria-current={isActive ? "true" : undefined}
+              className={`${CHIP} ${
+                isActive
+                  ? "bg-ink text-white"
+                  : "bg-cream text-body hover:bg-hover"
+              }`}
+            >
+              {filter.label}
+              {count === undefined ? null : (
+                <span className={isActive ? "text-white/70" : "text-mute"}>
+                  {" "}
+                  {formatCount(count)}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
       {rows.length === 0 ? (
         <CardBody>
           <p className="text-[12.5px] leading-[1.6] text-body">
-            Nothing in your scope is waiting on a decision. A planner scoped
-            to one region can legitimately see an empty queue; it means the
-            open work sits outside your categories or regions, not that the
-            system produced nothing.
+            {activeType === null
+              ? `Nothing in your scope is waiting on a decision. A planner scoped to one region can legitimately see an empty queue; it means the open work sits outside your categories or regions, not that the system produced nothing.`
+              : `No ${destinationLabel(activeType).toLowerCase()} row in your scope is waiting on a decision. Other types may still have open work -- clear the filter to see the whole queue.`}
           </p>
         </CardBody>
       ) : (
-        <DataTable
-          caption="Open recommendations ranked by value at stake"
-          columns={columns}
-          rows={rows}
-          rowKey={(row, index) => String(row.id ?? index)}
-        />
+        <RowLimit visible={VISIBLE_ROWS} total={rows.length}>
+          <DataTable
+            caption="Open recommendations ranked by value at stake"
+            columns={columns}
+            rows={rows}
+            rowKey={(row, index) => String(row.id ?? index)}
+          />
+        </RowLimit>
       )}
     </Card>
   );

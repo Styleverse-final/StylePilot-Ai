@@ -34,7 +34,9 @@ type Fold = {
   manualPct: number;
 };
 
-function isJsonObject(value: Json | undefined): value is { [k: string]: Json | undefined } {
+function isJsonObject(
+  value: Json | undefined,
+): value is { [k: string]: Json | undefined } {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -210,53 +212,77 @@ export type AccuracyCardProps = {
   accuracy: AccuracyHeadline | null;
   /** metrics for the SAME registry row the headline came from. */
   metrics: ModelMetrics | null;
+  /**
+   * Render the body without card chrome, for <EvidencePanel>, which supplies
+   * the surface and the selector. The title and subtitle still render here:
+   * the dropdown names the CHOICE, and the panel names the thing chosen.
+   */
+  bare?: boolean;
 };
 
-export function AccuracyCard({ accuracy, metrics }: AccuracyCardProps) {
+/** Selector label and card title. Exported so the two cannot drift. */
+export const ACCURACY_TITLE = "Accuracy against benchmarks";
+
+export function AccuracyCard({
+  accuracy,
+  metrics,
+  bare = false,
+}: AccuracyCardProps) {
   const folds = parseFolds(metrics);
+  const TITLE = ACCURACY_TITLE;
+  const SUBTITLE =
+    accuracy && accuracy.foldCount !== null
+      ? `${accuracy.foldCount} folds, rolling origin`
+      : "Rolling origin backtest";
+
+  const body = (
+    <>
+      {accuracy === null ? (
+        <p className="text-[12.5px] leading-[1.6] text-body">
+          No planning-grain model is visible in your scope, so there is no
+          backtest to show. Accuracy is never estimated on this screen; if the
+          registry row is not readable, the card says so.
+        </p>
+      ) : (
+        <>
+          <AccuracyStatement accuracy={accuracy} variant="bars" />
+
+          {folds.length === 0 ? null : (
+            <div className="mt-[16px] border-t border-rule pt-[14px]">
+              <div className="mb-[6px] text-[11px] font-bold text-mute">
+                Fold by fold, same row mask
+              </div>
+              <div className="max-w-[460px]">
+                <FoldChart folds={folds} meanPct={accuracy.headlinePct} />
+              </div>
+              <div className="mt-[8px] flex flex-wrap gap-[12px] text-[11px] font-semibold text-body">
+                <LegendSwatch color={BAR_MODEL} label="Model" />
+                <LegendSwatch color={BAR_SNAIVE} label="Seasonal naive" />
+                <LegendSwatch color={BAR_MANUAL} label="Manual baseline" />
+              </div>
+              <p className="mt-[10px] text-[11.5px] font-semibold leading-[1.6] text-mute">
+                The headline is the mean of these folds, not a selected best
+                one. Every fold is scored on the same rows, so the three bars in
+                a group are directly comparable.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+
+  // The section header above already carries TITLE and SUBTITLE, so the body
+  // is all that is wanted here; repeating the heading inside its own panel
+  // would state the same thing twice, six inches apart.
+  if (bare) {
+    return <div className="max-w-[760px] px-[20px] py-[16px]">{body}</div>;
+  }
 
   return (
     <Card>
-      <CardHeader
-        title="Accuracy against benchmarks"
-        subtitle={
-          accuracy && accuracy.foldCount !== null
-            ? `${accuracy.foldCount} folds, rolling origin`
-            : "Rolling origin backtest"
-        }
-      />
-      <CardBody>
-        {accuracy === null ? (
-          <p className="text-[12.5px] leading-[1.6] text-body">
-            No planning-grain model is visible in your scope, so there is no
-            backtest to show. Accuracy is never estimated on this screen; if
-            the registry row is not readable, the card says so.
-          </p>
-        ) : (
-          <>
-            <AccuracyStatement accuracy={accuracy} variant="bars" />
-
-            {folds.length === 0 ? null : (
-              <div className="mt-[16px] border-t border-rule pt-[14px]">
-                <div className="mb-[6px] text-[11px] font-bold text-mute">
-                  Fold by fold, same row mask
-                </div>
-                <FoldChart folds={folds} meanPct={accuracy.headlinePct} />
-                <div className="mt-[8px] flex flex-wrap gap-[12px] text-[11px] font-semibold text-body">
-                  <LegendSwatch color={BAR_MODEL} label="Model" />
-                  <LegendSwatch color={BAR_SNAIVE} label="Seasonal naive" />
-                  <LegendSwatch color={BAR_MANUAL} label="Manual baseline" />
-                </div>
-                <p className="mt-[10px] text-[11.5px] font-semibold leading-[1.6] text-mute">
-                  The headline is the mean of these folds, not a selected best
-                  one. Every fold is scored on the same rows, so the three
-                  bars in a group are directly comparable.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-      </CardBody>
+      <CardHeader title={TITLE} subtitle={SUBTITLE} />
+      <CardBody>{body}</CardBody>
     </Card>
   );
 }

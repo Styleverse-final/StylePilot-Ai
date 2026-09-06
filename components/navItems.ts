@@ -161,6 +161,24 @@ export function navFor(role: string | null | undefined): NavConfig {
 }
 
 /**
+ * Is `href` the route the reader is on?
+ *
+ * Here rather than in TopNav because the tab row is no longer the only thing
+ * that asks: the narrow-viewport sheet highlights the same current route, and
+ * two copies of this would be two chances for the bar and the sheet to
+ * disagree about where the reader is.
+ *
+ * The prefix test is what makes a detail route light its parent tab -- a
+ * reader on /buy/AW25-KNIT is still in Buy. "/" is special-cased because it
+ * prefixes every route in the app, and without that every tab would be active
+ * on every screen.
+ */
+export function isActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/**
  * ROUTE GUARDS -- where nav absence becomes a redirect, and where it does not.
  *
  * Two different things are being expressed and they should not be conflated:

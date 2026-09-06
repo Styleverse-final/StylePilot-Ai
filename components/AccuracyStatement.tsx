@@ -1,5 +1,11 @@
+import type { ReactNode } from "react";
+
 import type { AccuracyHeadline } from "@/lib/accuracy";
 
+import { KpiCard, type KpiCardDensity } from "./KpiCard";
+import { Kpi } from "./KpiRow";
+import { Track } from "./Marks";
+import { Pill } from "./Pill";
 import { Why } from "./Why";
 
 /**
@@ -26,7 +32,7 @@ import { Why } from "./Why";
 
 export type AccuracyStatementProps = {
   accuracy: AccuracyHeadline;
-  variant?: "inline" | "bars" | "compact";
+  variant?: "inline" | "bars" | "compact" | "card";
   /**
    * bars only. Move the per-bar reasoning and the MASE line behind a single
    * <Why>, leaving the three percentages and their bars visible.
@@ -40,6 +46,56 @@ export type AccuracyStatementProps = {
    * over seasonal naive are on the BARS, which stay visible.
    */
   notesBehindWhy?: boolean;
+  /**
+   * inline only. Where the headline is decomposed -- normally "#id" for the
+   * accuracy panel on the same screen. Part H is why this exists: the header
+   * figure is the summary of an argument made in full further down, and a
+   * reader who wants the argument should not have to go looking for it.
+   */
+  href?: string;
+  /** card only. Link text for the panel the card opens onto. */
+  hrefLabel?: string;
+  /** card only. The 16px glyph for the card tile. */
+  icon?: ReactNode;
+  /**
+   * card only. "stacked" is the command centre's tall card with the benchmark
+   * rail drawn under the value; "inline" is the buy plan's short one, tile at
+   * the left, which drops the rail so the accuracy card stands the same
+   * height as the four measures beside it.
+   *
+   * Part H is untouched by the choice. Dropping the MARK is not dropping the
+   * margin: the +x.x vs naive pill sits against the headline in both forms,
+   * the three percentages stay in the basis line, and the full comparison is
+   * still one press away in the card's own panel.
+   */
+  cardVariant?: "stacked" | "inline";
+  /** card only. "plain" is the single white surface of the buy plan's strip. */
+  cardSurface?: "tint" | "plain";
+  /**
+   * card only. "compact" is the workbench's: the same card with less chrome,
+   * for a strip of five that has to hold one line in a narrower column.
+   *
+   * Part H is untouched. Nothing that shrinks carries an argument -- the
+   * headline stays at 21px, the seasonal-naive pill beside it is unchanged,
+   * and the basis line and the disclosure under them are the same words.
+   */
+  cardDensity?: KpiCardDensity;
+  /**
+   * card + cardVariant="inline" only. Draw the fold count, MASE and the
+   * manual margin as the card's basis line instead of leaving them to the
+   * disclosure.
+   *
+   * OPT-IN, because it costs a line of height every card in a strip then has
+   * to match. The buy plan's five cards stand beside four measures that carry
+   * no basis, so it does not ask for it; the allocation strip's do, and on
+   * that screen the line is what stops "82.6%" being read as a single
+   * measurement rather than the mean of several folds.
+   *
+   * Part H is unaffected in both directions: this only PROMOTES figures that
+   * were already one press away, and the headline still cannot render without
+   * the seasonal-naive margin beside it.
+   */
+  cardBasis?: boolean;
   className?: string;
 };
 
@@ -55,12 +111,18 @@ function Bar({
   note?: string;
 }) {
   const fill =
-    tone === "model" ? "bg-orange" : tone === "bench" ? "bg-violet" : "bg-[#D8CCC2]";
+    tone === "model"
+      ? "bg-orange"
+      : tone === "bench"
+        ? "bg-violet"
+        : "bg-[#D8CCC2]";
   return (
     <div className="py-[11px] border-b border-rule last:border-b-0">
       <div className="flex items-baseline justify-between gap-[10px] mb-[6px]">
         <span className="text-copy font-bold">{label}</span>
-        <span className="text-copy font-extrabold tabular">{pct.toFixed(1)}%</span>
+        <span className="text-copy font-extrabold tabular">
+          {pct.toFixed(1)}%
+        </span>
       </div>
       <div className="h-[8px] rounded-pill bg-cream overflow-hidden">
         <div
@@ -68,7 +130,9 @@ function Bar({
           style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
         />
       </div>
-      {note ? <div className="mt-[5px] text-small font-semibold text-mute">{note}</div> : null}
+      {note ? (
+        <div className="mt-[5px] text-small font-semibold text-mute">{note}</div>
+      ) : null}
     </div>
   );
 }
@@ -77,8 +141,30 @@ export function AccuracyStatement({
   accuracy: a,
   variant = "inline",
   notesBehindWhy = false,
+  href,
+  hrefLabel,
+  icon,
+  cardVariant = "stacked",
+  cardSurface = "tint",
+  cardDensity = "default",
+  cardBasis = false,
   className,
 }: AccuracyStatementProps) {
+  /**
+   * The fold count, MASE and the manual margin, on one line.
+   *
+   * Composed once and used by both the flat header KPI and the inline card,
+   * so the two forms of the same statement cannot drift apart -- and so the
+   * fold count is omitted in both when the registry row carries no by_fold.
+   * No fold count is better than an invented one.
+   */
+  const basisLine = (
+    <>
+      {a.foldCount === null ? null : <>mean of {a.foldCount} folds &middot; </>}
+      MASE {a.mase.toFixed(2)} &middot; +{a.vsManualPoints.toFixed(1)} vs manual
+    </>
+  );
+
   if (variant === "compact") {
     return (
       <Why
@@ -101,33 +187,125 @@ export function AccuracyStatement({
         rolling-origin {a.foldCount === null ? "folds" : "folds"}, MASE{" "}
         {a.mase.toFixed(2)} against seasonal naive at{" "}
         {a.maseSeasonalNaive.toFixed(2)}; below 1.00 beats the benchmark on its
-        own scale. The authored manual baseline sits at {a.manualPct.toFixed(1)}%,
-        so the margin over it is {a.vsManualPoints.toFixed(1)} points -- a bigger
-        number that proves less, because that baseline was calibrated to a
-        target by the dataset designer. Seasonal naive is the benchmark nobody
+        own scale. The authored manual baseline sits at {a.manualPct.toFixed(1)}
+        %, so the margin over it is {a.vsManualPoints.toFixed(1)} points -- a
+        bigger number that proves less, because that baseline was calibrated to
+        a target by the dataset designer. Seasonal naive is the benchmark nobody
         constructed, which is why its margin is the one on the line above.
       </Why>
     );
   }
 
+  if (variant === "card") {
+    // The three figures the bars variant plots, on one rail. Padding the
+    // domain keeps the outermost tick off the edge of the mark; it is
+    // computed from the figures rather than fixed, because a brand whose
+    // manual baseline is closer would otherwise draw three marks on top of
+    // one another.
+    const lo = Math.min(a.manualPct, a.seasonalNaivePct, a.headlinePct);
+    const hi = Math.max(a.manualPct, a.seasonalNaivePct, a.headlinePct);
+    const pad = Math.max(4, (hi - lo) * 0.25);
+
+    return (
+      <KpiCard
+        className={className}
+        tone="green"
+        variant={cardVariant}
+        surface={cardSurface}
+        density={cardDensity}
+        icon={icon}
+        label="Forecast accuracy"
+        value={`${a.headlinePct.toFixed(1)}%`}
+        /* The margin that proves it, never separated from the headline. */
+        pill={
+          <Pill
+            variant="up"
+            tabular
+            title="Percentage points above seasonal naive, scored on the same rows."
+          >
+            +{a.vsSeasonalNaivePoints.toFixed(1)} vs naive
+          </Pill>
+        }
+        mark={
+          cardVariant === "inline" ? undefined : (
+            <Track
+              label={`Model at ${a.headlinePct.toFixed(1)} percent, seasonal naive at ${a.seasonalNaivePct.toFixed(1)}, manual baseline at ${a.manualPct.toFixed(1)}`}
+              domain={[Math.max(0, lo - pad), Math.min(100, hi + pad)]}
+              ticks={[
+                { at: a.manualPct },
+                { at: a.seasonalNaivePct },
+                { at: a.headlinePct, primary: true },
+              ]}
+            />
+          )
+        }
+        /* The stacked card states the three figures under its mark. The
+           inline card has no mark to caption and stands in a row of four
+           other measures that carry none, so the rail moves into the panel
+           below rather than being dropped: the numbers are the same, one
+           press further in. */
+        basis={
+          cardVariant === "inline" ? (
+            cardBasis ? basisLine : undefined
+          ) : (
+            <>
+              model {a.headlinePct.toFixed(1)} &middot; naive{" "}
+              {a.seasonalNaivePct.toFixed(1)} &middot; manual{" "}
+              {a.manualPct.toFixed(1)}
+            </>
+          )
+        }
+        detail={
+          <>
+            {cardVariant === "inline" ? (
+              <span className="mb-[6px] block">
+                {`Model ${a.headlinePct.toFixed(1)}%, seasonal naive ${a.seasonalNaivePct.toFixed(1)}%, authored manual baseline ${a.manualPct.toFixed(1)}% -- all three scored on the identical row mask.`}
+              </span>
+            ) : null}
+            <span className="block">
+              No trend is drawn because none exists to draw: the registry holds
+              four model versions trained inside the same two minutes, so there
+              is no retrain history. What the mark shows instead is where the
+              model sits against the two benchmarks it was scored beside on the
+              identical row mask.
+            </span>
+            <span className="mt-[6px] block">
+              {`MASE ${a.mase.toFixed(3)} against seasonal naive at ${a.maseSeasonalNaive.toFixed(3)}; below 1.00 beats the benchmark on its own scale.`}
+              {a.foldCount === null
+                ? null
+                : ` Mean of ${a.foldCount} rolling-origin folds.`}
+            </span>
+            <span className="mt-[6px] block">
+              {`The authored manual baseline sits at ${a.manualPct.toFixed(1)}%, so the margin over it is ${a.vsManualPoints.toFixed(1)} points -- a bigger number that proves less, because that baseline was calibrated to a target by the dataset designer.`}
+            </span>
+          </>
+        }
+        href={href}
+        hrefLabel={hrefLabel}
+      />
+    );
+  }
+
   if (variant === "inline") {
     return (
-      <div className={className}>
-        <div className="text-label font-bold text-mute">Forecast accuracy</div>
-        <div className="mt-[3px] flex items-center gap-[7px]">
-          <b className="text-kpi font-extrabold tabular">{a.headlinePct.toFixed(1)}%</b>
-          {/* The margin that proves it, never separated from the headline. */}
-          <span className="rounded-pill bg-greenW px-[9px] py-[3px] text-th font-extrabold text-green whitespace-nowrap">
+      <Kpi
+        className={className}
+        label="Forecast accuracy"
+        href={href}
+        linkLabel="Forecast accuracy, against both benchmarks"
+        value={`${a.headlinePct.toFixed(1)}%`}
+        /* The margin that proves it, never separated from the headline. */
+        pill={
+          <Pill
+            variant="up"
+            tabular
+            title="Percentage points above seasonal naive, scored on the same rows."
+          >
             +{a.vsSeasonalNaivePoints.toFixed(1)} vs naive
-          </span>
-        </div>
-        <div className="mt-[3px] text-small font-semibold text-mute">
-          {/* No fold count is better than an invented one: the registry row
-              simply does not always carry by_fold. */}
-          {a.foldCount === null ? null : <>mean of {a.foldCount} folds &middot; </>}
-          MASE {a.mase.toFixed(2)} &middot; +{a.vsManualPoints.toFixed(1)} vs manual
-        </div>
-      </div>
+          </Pill>
+        }
+        hint={basisLine}
+      />
     );
   }
 

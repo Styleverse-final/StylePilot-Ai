@@ -400,6 +400,54 @@ export function formatCeiling(value: number): string {
   return `${value.toFixed(2)} pp`;
 }
 
+/**
+ * Split autonomy_band.escalates_when into the triggers it lists.
+ *
+ * The column is one prose sentence-or-three written by governance, and the
+ * band card sets it as a list because a reader scanning for "is my case one
+ * of these" should not have to parse a paragraph to find out. THE LIST IS
+ * TYPOGRAPHY, NOT AUTHORSHIP: every item returned here is a verbatim slice of
+ * the stored string. Nothing is reworded, nothing is added, and no trigger is
+ * invented in a component -- if governance widens the band tomorrow, the list
+ * changes with the column and not with a deploy.
+ *
+ * The boundary is a sentence terminator or a semicolon, and a full stop
+ * between two digits is not one: "shifts of 1.25 pp or more" must not become
+ * "shifts of 1." and "25 pp or more", which would destroy the very number the
+ * clause exists to state. That is the same rule the exception queue's
+ * rationale splitter needs, for the same reason.
+ *
+ * Fewer than two clauses means the prose does not enumerate anything, so this
+ * returns an empty list and the caller keeps the paragraph. A one-item bullet
+ * list is a paragraph wearing a dot.
+ */
+export function escalationClauses(text: string | null | undefined): string[] {
+  if (!text) return [];
+
+  const clauses: string[] = [];
+  let start = 0;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch !== "." && ch !== ";") continue;
+
+    const prev = text[i - 1];
+    const next = text[i + 1];
+    if (ch === "." && prev >= "0" && prev <= "9" && next >= "0" && next <= "9") {
+      continue;
+    }
+
+    const clause = text.slice(start, i).trim();
+    if (clause.length > 0) clauses.push(clause);
+    start = i + 1;
+  }
+
+  const tail = text.slice(start).trim();
+  if (tail.length > 0) clauses.push(tail);
+
+  return clauses.length < 2 ? [] : clauses;
+}
+
 const TIMESTAMP = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",

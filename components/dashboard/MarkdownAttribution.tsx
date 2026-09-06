@@ -67,69 +67,93 @@ export type DriverCoverage = {
 export type MarkdownAttributionProps = {
   /** Keyed by the driver key above: "buy" | "allocation" | "response". */
   coverage: Readonly<Record<string, DriverCoverage>>;
+  /**
+   * Render the body without card chrome, for <EvidencePanel>, which supplies
+   * the surface and the selector. The title and subtitle still render here:
+   * the dropdown names the CHOICE, and the panel names the thing chosen.
+   */
+  bare?: boolean;
 };
 
-export function MarkdownAttribution({ coverage }: MarkdownAttributionProps) {
+/** Selector label and card title. Exported so the two cannot drift. */
+export const MARKDOWN_TITLE = "Where markdown comes from";
+
+export function MarkdownAttribution({
+  coverage,
+  bare = false,
+}: MarkdownAttributionProps) {
   const covered = CASE_ATTRIBUTION.filter(
     (driver) => (coverage[driver.key]?.openCount ?? 0) > 0,
   ).length;
 
+  const TITLE = MARKDOWN_TITLE;
+  const SUBTITLE =
+    "The case brief's attribution, against what the product now covers";
+
+  const body = (
+    <>
+      {CASE_ATTRIBUTION.map((driver) => {
+        const live = coverage[driver.key];
+        return (
+          <ProgressRow
+            key={driver.key}
+            label={driver.label}
+            value={`${driver.casePct}% of loss`}
+            fraction={driver.casePct / 100}
+            note={
+              <>
+                Covered by{" "}
+                <Link
+                  href={driver.href}
+                  className="font-bold text-orangeD underline decoration-peach underline-offset-2 hover:decoration-orange"
+                >
+                  {driver.covers}
+                </Link>
+                {live && live.openCount > 0 ? (
+                  <>
+                    {" "}
+                    &middot; {formatCount(live.openCount)} open{" "}
+                    {plural(
+                      live.openCount,
+                      "recommendation",
+                      "recommendations",
+                    )}{" "}
+                    in your scope
+                    {live.openValueInr === null ? (
+                      <>, scored in percentage points rather than rupees</>
+                    ) : (
+                      <> carrying {formatCrore(live.openValueInr)}</>
+                    )}
+                  </>
+                ) : (
+                  <> &middot; nothing open in your scope right now</>
+                )}
+              </>
+            }
+          />
+        );
+      })}
+      <p className="mt-[12px] max-w-[72ch] text-[11.5px] font-semibold leading-[1.6] text-mute">
+        The three shares are the case brief&rsquo;s own attribution of markdown
+        loss and are the one set of figures on this screen that is not read from
+        the database; no table carries them. All three drivers are covered by a
+        screen that can act on them, and {covered} of {CASE_ATTRIBUTION.length}{" "}
+        currently have open work in your scope.
+      </p>
+    </>
+  );
+
+  // The section header above already carries TITLE and SUBTITLE, so the body
+  // is all that is wanted here; repeating the heading inside its own panel
+  // would state the same thing twice, six inches apart.
+  if (bare) {
+    return <div className="max-w-[760px] px-[20px] py-[16px]">{body}</div>;
+  }
+
   return (
     <Card>
-      <CardHeader
-        title="Where markdown comes from"
-        subtitle="The case brief's attribution, against what the product now covers"
-      />
-      <CardBody>
-        {CASE_ATTRIBUTION.map((driver) => {
-          const live = coverage[driver.key];
-          return (
-            <ProgressRow
-              key={driver.key}
-              label={driver.label}
-              value={`${driver.casePct}% of loss`}
-              fraction={driver.casePct / 100}
-              note={
-                <>
-                  Covered by{" "}
-                  <Link
-                    href={driver.href}
-                    className="font-bold text-orangeD underline decoration-peach underline-offset-2 hover:decoration-orange"
-                  >
-                    {driver.covers}
-                  </Link>
-                  {live && live.openCount > 0 ? (
-                    <>
-                      {" "}
-                      &middot; {formatCount(live.openCount)} open{" "}
-                      {plural(
-                        live.openCount,
-                        "recommendation",
-                        "recommendations",
-                      )}{" "}
-                      in your scope
-                      {live.openValueInr === null ? (
-                        <>, scored in percentage points rather than rupees</>
-                      ) : (
-                        <> carrying {formatCrore(live.openValueInr)}</>
-                      )}
-                    </>
-                  ) : (
-                    <> &middot; nothing open in your scope right now</>
-                  )}
-                </>
-              }
-            />
-          );
-        })}
-        <p className="mt-[12px] max-w-[72ch] text-[11.5px] font-semibold leading-[1.6] text-mute">
-          The three shares are the case brief&rsquo;s own attribution of
-          markdown loss and are the one set of figures on this screen that is
-          not read from the database; no table carries them. All three drivers
-          are covered by a screen that can act on them, and {covered} of{" "}
-          {CASE_ATTRIBUTION.length} currently have open work in your scope.
-        </p>
-      </CardBody>
+      <CardHeader title={TITLE} subtitle={SUBTITLE} />
+      <CardBody>{body}</CardBody>
     </Card>
   );
 }

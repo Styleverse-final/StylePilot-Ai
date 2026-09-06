@@ -3,12 +3,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
+  Banner,
   Card,
   CardBody,
+  KpiCard,
   ModelStrip,
   PageHeader,
+  Pill,
   Why,
-  type KpiItem,
 } from "@/components";
 import { DepthCurve } from "@/components/markdown/DepthCurve";
 import { ElasticityPanel } from "@/components/markdown/ElasticityPanel";
@@ -37,6 +39,13 @@ import {
   formatInr,
   formatTimestamp,
 } from "@/components/markdown/format";
+import {
+  CeilingIcon,
+  LayersIcon,
+  RupeeIcon,
+  ScissorsIcon,
+  TagIcon,
+} from "@/components/markdown/icons";
 import type { CategoryFit, MarkdownRow } from "@/components/markdown/types";
 import { getAccuracyHeadline, type AccuracyHeadline } from "@/lib/accuracy";
 import { getElasticity, getMarkdownRecs } from "@/lib/queries";
@@ -92,6 +101,20 @@ export const metadata: Metadata = {
 
 /** How many styles the curve selector offers before it becomes a wall. */
 const MAX_CURVE_CHOICES = 8;
+
+/** The separator in the rail under the Ask button. */
+const BAR = String.fromCharCode(0x2502); // box drawings light vertical
+
+/**
+ * The title, in the two-tone form the buy plan and the command centre use:
+ * the subject in ink, the thing this screen does to it in orange. Declared
+ * once because the no-brand branch renders the same header.
+ */
+const TITLE = (
+  <>
+    Markdown <span className="text-orange">optimiser</span>
+  </>
+);
 
 /**
  * The one sentence the screen was making the reader derive.
@@ -156,11 +179,21 @@ function Explain({ children }: { children: ReactNode }) {
   );
 }
 
-/** Header KPIs, folded from the rows on screen. Nothing is typed in by hand. */
-function headerKpis(rows: readonly MarkdownRow[]): KpiItem[] {
-  const now = rows.filter((row) => row.timing === "NOW");
-  const saved = rows.reduce((sum, row) => sum + row.marginSaved, 0);
+/** The five header figures, folded from the rows on screen. */
+type HeaderFigures = {
+  total: number;
+  now: number;
+  saved: number;
+  /** Rows whose recommended depth has reached the policy ceiling. */
+  atCap: number;
+  /** Rows carrying BOTH a list price and a projected leftover. */
+  priced: number;
+  unpriced: number;
+  exposed: number;
+};
 
+/** Folded from the rows on screen. Nothing here is typed in by hand. */
+function headerFigures(rows: readonly MarkdownRow[]): HeaderFigures {
   // The leftover can only be valued at list where BOTH the projected
   // leftover and the style's list price came back. A row missing either is
   // left OUT of the total and counted on the pill instead of being folded
@@ -170,39 +203,194 @@ function headerKpis(rows: readonly MarkdownRow[]): KpiItem[] {
   const priced = rows.filter(
     (row) => row.listPriceInr !== null && row.projectedLeftoverUnits !== null,
   );
-  const unpriced = rows.length - priced.length;
-  const exposed = priced.reduce(
-    (sum, row) => sum + (row.listPriceInr ?? 0) * (row.projectedLeftoverUnits ?? 0),
-    0,
-  );
 
-  return [
-    { label: "Styles in the window", value: formatCount(rows.length) },
-    {
-      label: "Cut this week",
-      value: formatCount(now.length),
-      pill: now.length > 0 ? "depth rising" : "none over trigger",
-      tone: now.length > 0 ? "down" : "grey",
-    },
-    {
-      label: `Margin saved vs acting ${DELAY_WEEKS} weeks late`,
-      value: formatInr(saved),
-    },
-    {
-      label:
-        unpriced > 0
-          ? `Leftover at list, ${formatCount(priced.length)} of ${formatCount(
-              rows.length,
-            )} styles`
-          : "Leftover at list",
-      value: rows.length > 0 && priced.length === 0 ? DASH : formatInr(exposed),
-      pill:
-        unpriced > 0
-          ? `${formatCount(unpriced)} unpriced, not counted`
-          : undefined,
-      tone: unpriced > 0 ? "amber" : undefined,
-    },
-  ];
+  return {
+    total: rows.length,
+    now: rows.filter((row) => row.timing === "NOW").length,
+    saved: rows.reduce((sum, row) => sum + row.marginSaved, 0),
+    atCap: rows.filter((row) => row.recommendedDepth >= MAX_DEPTH - 1e-9).length,
+    priced: priced.length,
+    unpriced: rows.length - priced.length,
+    exposed: priced.reduce(
+      (sum, row) =>
+        sum + (row.listPriceInr ?? 0) * (row.projectedLeftoverUnits ?? 0),
+      0,
+    ),
+  };
+}
+
+/**
+ * THE HEADER BAND.
+ *
+ * Five tracked measures, in the band under the title rather than the flat
+ * KPI row that used to sit beside it. The flat row is right for a screen
+ * with two or three reference figures and no caveats; this screen has
+ * neither. "Margin saved vs acting 4 weeks late" is a five-word label
+ * against a crore figure, the leftover total carries a denominator that
+ * changes with the data, and squeezed between a 26px title and the Ask
+ * button each of them got about 165px -- which is where the value and its
+ * pill start wrapping onto separate lines.
+ *
+ * Every caveat that used to be crammed into a pill is now behind that
+ * card's own disclosure, in sentences: which styles the window admits, what
+ * the 5% trigger is measured against, how many rows carry a price, and why
+ * a depth at the ceiling stops timing being the lever. Nothing was cut to
+ * make room -- the pills said less in more space.
+ *
+ * THE TRACKS ARE minmax(max-content, share), as on the allocation board: the
+ * FLOOR of each column is whatever that card actually holds, and the share
+ * only divides the slack above the floors. An inline card's label does not
+ * wrap, so a fixed fr narrower than its own label overflows the card rather
+ * than reflowing it, and sizing from content is also what keeps each pill on
+ * the value line instead of dropping under it.
+ *
+ * Part H holds: no accuracy figure appears here. The headline reaches this
+ * page only through <ModelStrip accuracy={...}/>, which cannot render the
+ * percentage without the margin over seasonal naive beside it, and a sixth
+ * card quoting it here would be exactly the bare percentage that rule
+ * exists to prevent.
+ */
+function HeaderBand({ figures }: { figures: HeaderFigures }) {
+  // The five floors here measure 1169px together, gaps included, which the
+  // shell can only give above a 1209px viewport -- so the fall to three
+  // columns is set at 1240 rather than the 1180 the other strips use, which
+  // is 31px of headroom over the measured figure and no more. A max-content
+  // track does not wrap when it runs out of room, it overflows, so this
+  // breakpoint is the only thing standing between the strip and a sideways
+  // scrollbar; it was measured against the rendered page rather than
+  // estimated from the labels. Three cards then two, both with slack spare.
+  return (
+    <div className="grid grid-cols-[minmax(max-content,0.9fr)_minmax(max-content,1fr)_minmax(max-content,1.05fr)_minmax(max-content,1.1fr)_minmax(max-content,0.95fr)] gap-[10px] max-[1240px]:grid-cols-3 max-[860px]:grid-cols-2">
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="violet"
+        icon={<LayersIcon />}
+        label="Styles in the window"
+        value={formatCount(figures.total)}
+        detail={
+          <>
+            A style enters this window only once{" "}
+            {formatFractionPct(LIFE_ELAPSED_TRIGGER, 0)} of its planned life
+            has elapsed, it is carrying more cover than its category&apos;s
+            ceiling allows, and it still has at least one trading week left.
+            Anything overstocked but earlier in its life is a buy or
+            allocation question and is answered on those screens. Row level
+            security scopes the count to your brand, region and categories, so
+            a colleague on the same brand can legitimately see a different
+            number.
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="orange"
+        icon={<ScissorsIcon />}
+        label="Cut this week"
+        value={formatCount(figures.now)}
+        pill={
+          <Pill variant={figures.now > 0 ? "down" : "grey"}>
+            {figures.now > 0 ? "depth rising" : "none over trigger"}
+          </Pill>
+        }
+        detail={
+          <>
+            Styles where waiting until the next review costs more than{" "}
+            {formatFractionPct(NOW_MARGIN_TRIGGER_PCT, 0)} of the
+            leftover&apos;s value at list. That share is recomputed in the
+            table from the recommendation&apos;s own parts rather than read
+            from a stored flag, so the trigger is something you can check
+            against the two numbers either side of it. Every row above it
+            reads Now; every row below it reads Hold.
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="green"
+        icon={<RupeeIcon />}
+        label="Margin saved"
+        value={formatInr(figures.saved)}
+        pill={<Pill variant="up">vs +{DELAY_WEEKS} weeks</Pill>}
+        detail={
+          <>
+            The margin the recommended plan keeps against the same plan set{" "}
+            {DELAY_WEEKS} weeks later, summed over every style in scope. It is
+            the pipeline&apos;s own figure, not a recomputation:{" "}
+            <span className="font-mono text-[11px] text-ink">margin_saved</span>{" "}
+            prices the incremental volume each cut shifts inside the window
+            that survives it. The {DELAY_WEEKS}-week lag is the case
+            study&apos;s description of an in-season cycle -- a weekly report,
+            a meeting, then an execution window -- not something measured
+            here.
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="amber"
+        icon={<TagIcon />}
+        label="Leftover at list"
+        value={
+          figures.total > 0 && figures.priced === 0
+            ? DASH
+            : formatInr(figures.exposed)
+        }
+        pill={
+          figures.unpriced > 0 ? (
+            <Pill variant="amber" tabular>
+              {formatCount(figures.priced)} of {formatCount(figures.total)}{" "}
+              priced
+            </Pill>
+          ) : undefined
+        }
+        detail={
+          <>
+            Projected leftover units at list price, summed over the{" "}
+            {formatCount(figures.priced)} of {formatCount(figures.total)}{" "}
+            {figures.total === 1 ? "style" : "styles"} carrying both figures.
+            {figures.unpriced > 0
+              ? ` The other ${formatCount(figures.unpriced)} ${
+                  figures.unpriced === 1 ? "is" : "are"
+                } left OUT of this total rather than folded in as a zero: a zero would claim the row is worth nothing, and the table below renders the same row as a dash. The headline and the table must not disagree about the same missing figure.`
+              : " Every style in scope carries both, so nothing is left out of this total."}
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        tone="red"
+        icon={<CeilingIcon />}
+        label="At the ceiling"
+        value={formatCount(figures.atCap)}
+        pill={
+          <Pill variant="grey" tabular>
+            of {formatCount(figures.total)}
+          </Pill>
+        }
+        detail={
+          <>
+            Styles whose recommended depth has reached the{" "}
+            {formatFractionPct(MAX_DEPTH, 0)} policy cap. On those the depth
+            has stopped being the variable: the cut is as deep as policy
+            allows at both dates and only the runway moves, so what a wait
+            actually costs is stranded stock rather than margin per unit. At
+            that much cover against that little life, most of the loss was
+            bought in rather than mistimed, and the buy plan is where it gets
+            fixed next season.
+          </>
+        }
+      />
+    </div>
+  );
 }
 
 /**
@@ -276,7 +464,7 @@ export default async function MarkdownPage({
   if (!brandId) {
     return (
       <>
-        <PageHeader eyebrow="20% of markdown loss" title="Markdown optimiser" />
+        <PageHeader eyebrow="20% of markdown loss" title={TITLE} />
         <Explain>
           You are signed in, but your account is not linked to a planner
           record, so there is no brand to scope a markdown plan to. Every
@@ -367,13 +555,20 @@ export default async function MarkdownPage({
       : (accuracy?.modelVersion ?? "no model on record");
 
   const nowCount = rows.filter((row) => row.timing === "NOW").length;
+  const finding = inference(rows);
 
   return (
     <>
       <PageHeader
         eyebrow="20% of markdown loss"
-        title="Markdown optimiser"
-        kpis={headerKpis(rows)}
+        title={TITLE}
+        tagline="Cut sooner. Lose less. Clear cleaner."
+        rail={
+          <>
+            Timing {BAR} Depth {BAR} Recovery
+          </>
+        }
+        band={<HeaderBand figures={headerFigures(rows)} />}
       />
 
       {readError ? (
@@ -384,13 +579,39 @@ export default async function MarkdownPage({
         </Explain>
       ) : (
         <>
-          {/* The thesis of the screen, in one sentence, immediately above the
-              rows it applies to. The mechanism behind it is 157 words and it
-              used to sit between the reader and the table. */}
-          <Why
-            lead="Waiting does not make the pile smaller. It makes the cut deeper."
-            label="the mechanism"
-            className="mb-[12px] block max-w-[104ch]"
+          {/*
+            THE THESIS, AS A BANNER RATHER THAN A LINE OF GREY TEXT.
+
+            It used to be a <Why>: a muted sentence with a truncating
+            ellipsis, followed immediately by the finding set as a second
+            paragraph of near-identical weight. Two sentences of different
+            KINDS -- one an identity that is always true, one a reading of
+            today's rows -- stacked as two paragraphs, with nothing telling
+            the reader which was which.
+
+            The identity is a derivation, which is what this component's
+            violet tone means everywhere else in the app, and the assertion
+            is the whole of it: someone who never opens the banner has read
+            the claim, and someone who wants to argue with it opens it and
+            finds all 157 words unchanged. The finding gets its own block
+            below, in ink on white, because it is the one of the two that
+            changes with the data.
+          */}
+          <Banner
+            variant="violet"
+            icon="%"
+            eyebrow="The mechanism"
+            title="Waiting does not make the pile smaller. It makes the cut deeper."
+            collapsible
+            measureCh={104}
+            aside={
+              <span className="block text-right text-micro font-extrabold uppercase tracking-[0.12em] text-mute">
+                Wait longer
+                <span className="mt-[3px] block text-[13px] font-extrabold tracking-normal text-violet">
+                  Cut deeper
+                </span>
+              </span>
+            }
           >
             A style holding more weeks of cover than it has weeks of life left
             will strand the difference unless the sell rate is lifted. Clearing
@@ -409,15 +630,32 @@ export default async function MarkdownPage({
             weekly report, a meeting, then an execution window. It is a premise
             of the case study, taken from {PIPELINE_SOURCE}, not something
             measured in this data.
-          </Why>
+          </Banner>
 
-          {/* The finding, stated rather than left to be derived from the rows
-              below it. Folded from those same rows, so it cannot disagree
-              with them. */}
-          {inference(rows) === null ? null : (
-            <p className="mb-[12px] max-w-[104ch] text-[13px] font-bold leading-[1.55] text-ink">
-              {inference(rows)}
-            </p>
+          {/*
+            THE FINDING, stated rather than left to be derived from the rows
+            below it. Folded from those same rows, so it cannot disagree with
+            them, and set on its own white surface so it reads as a reading
+            of today's data rather than as a second half of the identity
+            above it. The orange dash is the same mark the page footer opens
+            with, drawn rather than typed so no glyph is announced as
+            punctuation.
+          */}
+          {finding === null ? null : (
+            <div className="mb-[16px] flex items-start gap-[12px] rounded-inner border border-rule bg-white px-[18px] py-[13px] shadow-raised">
+              <span
+                aria-hidden="true"
+                className="mt-[7px] h-[2px] w-[20px] flex-none rounded-pill bg-orange"
+              />
+              <div className="min-w-0">
+                <div className="text-micro font-extrabold uppercase tracking-[0.1em] text-mute">
+                  What these rows say
+                </div>
+                <p className="mt-[3px] max-w-[100ch] text-[13px] font-bold leading-[1.55] text-ink">
+                  {finding}
+                </p>
+              </div>
+            </div>
           )}
 
           <RecommendationTable rows={rows} />

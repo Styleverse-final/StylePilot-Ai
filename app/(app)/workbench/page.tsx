@@ -6,10 +6,11 @@ import {
   Card,
   CardBody,
   CardHeader,
+  KpiCard,
   ModelStrip,
   PageHeader,
+  Pill,
   Why,
-  type KpiItem,
 } from "@/components";
 import { DriverPanel } from "@/components/workbench/DriverPanel";
 import {
@@ -21,6 +22,13 @@ import {
   CensoringNote,
   CoverageNote,
 } from "@/components/workbench/ForecastNotes";
+import {
+  BandIcon,
+  GridIcon,
+  HistoryIcon,
+  HorizonIcon,
+  TargetIcon,
+} from "@/components/workbench/icons";
 import { ModelFacts } from "@/components/workbench/ModelFacts";
 import {
   ScopeSelectors,
@@ -82,11 +90,14 @@ export const metadata: Metadata = {
  * PART H
  * ------
  * The headline accuracy never appears on its own. It is rendered through
- * <AccuracyStatement/> in the header (inline form: headline with the margin
- * over seasonal naive attached) and again in the right column (bars form:
- * model, seasonal naive, manual, with the reason the manual margin proves
- * less than its size). <ModelStrip/> deliberately does NOT receive its
- * optional accuracyPct prop, because that prop would print the headline alone.
+ * <AccuracyStatement/> in the header band (card form: headline, the margin
+ * over seasonal naive attached to it, and the fold count and MASE on the
+ * basis line under both) and again in the right column (bars form: model,
+ * seasonal naive, manual, with the reason the manual margin proves less than
+ * its size). The header card links to the right column's, so the summary and
+ * the argument it summarises are one press apart. <ModelStrip/> deliberately
+ * does NOT receive its optional accuracy prop, because a second copy of the
+ * statement two rows under the first is noise rather than provenance.
  */
 
 // ------------------------------------------------------------------ tuning
@@ -107,6 +118,12 @@ const SCOPE_ROW_CAP = 1000;
 
 /** Fixed zone so the server render and the hydrated client agree. */
 const TIME_ZONE = "Asia/Kolkata";
+
+/** The separator in the rail at the head of the page. */
+const BAR = String.fromCharCode(0x2502); // box drawings light vertical
+
+/** The dimension join in the scope card's disclosure. */
+const MULTIPLY = String.fromCharCode(0xd7); // multiplication sign
 
 // ------------------------------------------------------------------- scope
 
@@ -317,7 +334,11 @@ function isBrandId(value: string): value is BrandId {
 function EmptyScope() {
   return (
     <>
-      <PageHeader eyebrow="Demand planning" title="Workbench" />
+      <PageHeader
+        eyebrow="Demand planning"
+        title="Workbench"
+        tagline="Forecast clearly. Decide confidently."
+      />
       <Card>
         <CardHeader
           title="No forecast series in your scope"
@@ -464,45 +485,259 @@ export default async function WorkbenchPage({
   const accuracyFolds = accuracy?.foldCount ?? 0;
   const calibrationFolds = accuracyFolds > 0 ? accuracyFolds - 1 : 0;
 
-  const kpis: KpiItem[] = [
-    {
-      label: "Series in your scope",
-      value: String(triples.length),
-      pill: "RLS-scoped",
-      tone: "grey",
-    },
-    {
-      label: "Horizon",
-      value: `${series.forward.length} wks`,
-    },
-    {
-      label: "History",
-      value: `${series.history.length} wks`,
-      pill: `${censoredWeeks} censored`,
-      tone: censoredWeeks > 0 ? "amber" : "grey",
-    },
-  ];
+  /*
+    FIVE CARDS RATHER THAN THE FLAT KPI ROW.
 
-  if (coveragePct !== null && calibrationFolds > 0) {
-    kpis.push({
-      label: "Interval",
-      value: "P10-P90",
-      // The fold count travels with the number so the caveat cannot be
-      // separated from the figure by a screenshot.
-      pill: `${coveragePct.toFixed(1)}% over ${calibrationFolds} folds`,
-      tone: "up",
-    });
-  }
+    The flat row was right while these were reference figures a planner
+    glanced past. They are not that. Every one of them carried a pill whose
+    meaning is the whole point of the pill -- "RLS-scoped", "36 censored",
+    "83.4% over 3 folds" -- and the flat <Kpi> has nowhere to put the sentence
+    that unpacks it, so this screen argued all three at length in its own
+    source comments and none of it reached the reader. Each figure now carries
+    its caveat behind its own disclosure: what the scope number is a count of,
+    why no accuracy is measured against the forward weeks, what greying a week
+    claims, and why the coverage figure rests on one fold fewer than the
+    accuracy beside it.
+
+    THE FIVE STAY ON ONE LINE, WHICH IS WHY THEY SIT IN THE BAND. Squeezed
+    between the title and the Ask button these five wrapped: the button was
+    pushed onto a row of its own and the accuracy figure's basis line ended up
+    ragged against the right edge of the page. The band is the full-width row
+    under the title and is exactly what PageHeader documents it for; the buy
+    plan and the allocation board put their own five there for the same
+    reason.
+
+    THE FIVE TRACKS ARE NOT EQUAL, AND THEY ARE PLAIN fr RATHER THAN
+    minmax(max-content, ...). The buy plan and the allocation board floor each
+    track at its own content, which is right when five cards have ~1400px to
+    share: nothing can be squeezed below what it contains. This column is
+    narrower, and a content floor there is not a safeguard but a guarantee of
+    a second row -- the floors sum to more than the width available, so the
+    grid has no choice but to wrap.
+
+    THE SHARES ARE MEASURED, NOT GUESSED. Each card was rendered at
+    width:max-content in a headless browser against this app's own compiled
+    CSS and Plus Jakarta Sans, and the shares below are those widths
+    normalised to sum to 5:
+
+        series 209px   horizon 162px   history 265px
+        interval 284px   accuracy 275px   -- 1193px + 24px of gaps
+
+    Every card gets exactly what it needs, and no card holds slack a
+    neighbour is short of; measured back, the strip is clean from about
+    1230px. Above that the slack divides in the same proportion and the five
+    grow together; below it they degrade in step rather than one card
+    collapsing while its neighbour keeps its slack, which is what an even
+    split or a hand-guessed weighting does.
+
+    WHAT GIVES BELOW THAT is the pill moving under its value, then a label
+    taking two lines -- the strip stays on ONE ROW down to 1080px, which is
+    where it finally falls to three columns. Nothing overflows and nothing is
+    truncated at any width: the implicit min-content floor still holds, and
+    density="compact" is what lets the label wrap rather than shove a card
+    onto a second row.
+
+    density="compact" is the other half of it. At default density these five
+    want about 1370px between them and had roughly 1230, so they broke to
+    three columns and back -- tiles, padding and disclosures alone were 480px
+    of the budget. Compact returns about 110px of that without shrinking a
+    single figure, pill or sentence.
+
+    THE HORIZON CARD LOST ITS PILL, and that is the one thing here that is a
+    cut rather than a re-tune. It named the first forward ISO week, which is
+    not a caveat on the number beside it the way "36 censored" or "83.4% over
+    3 folds" are -- it is a detail, and it now sits in that card's disclosure
+    with the embargo sentence it belongs to. It was also the most expensive
+    105px on the strip.
+
+    TWO CARDS SHARE A TONE, ON PURPOSE. Green is the model measured against
+    realised weeks, and the interval and the accuracy are both exactly that:
+    one is how often the band caught the outturn, the other how close the line
+    came to it. They are the two calibration figures on this screen and
+    reading as a pair is correct. Violet is the scope the session resolved,
+    orange the weeks you are being asked to plan, amber the caution on the
+    history behind them. The glyphs tell the five apart by shape regardless,
+    which is why they are drawn to be distinguishable at 16px.
+
+    Part H is why the accuracy card is rendered by AccuracyStatement and not
+    by a KpiCard here: that component cannot draw the headline without the
+    seasonal-naive margin beside it, and no accuracy percentage is written as
+    a literal anywhere in this file.
+  */
+  const headerCards = (
+    <div className="grid grid-cols-[0.87fr_0.68fr_1.11fr_1.19fr_1.15fr] gap-[6px] max-[1080px]:grid-cols-3 max-[700px]:grid-cols-2">
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        density="compact"
+        tone="violet"
+        icon={<GridIcon />}
+        label="Series in scope"
+        value={String(triples.length)}
+        pill={<Pill variant="violet">RLS-scoped</Pill>}
+        detail={
+          <>
+            Category {MULTIPLY} channel {MULTIPLY} region series your own
+            session can read
+            {brandsInScope.length > 1 ? `, within ${brandId}` : ""}. A
+            colleague on the same brand with a different region sees a
+            different number, and a short list is your scope rather than a
+            fault: the selectors are built from these, so a combination that
+            would come back empty is never offered.
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        density="compact"
+        tone="orange"
+        icon={<HorizonIcon />}
+        label="Horizon"
+        value={`${series.forward.length} wks`}
+        detail={
+          <>
+            The forward weeks drawn to the right of &quot;now&quot;, each
+            carrying a P50 and a calibrated P10-P90
+            {firstForward === undefined
+              ? ""
+              : `, starting at ${firstForward.iso_week}`}
+            . Their actuals are under embargo, so none of the accuracy quoted
+            on this screen is measured against any of them -- it is a
+            historical rolling-origin backtest and nothing else.
+          </>
+        }
+      />
+
+      <KpiCard
+        variant="inline"
+        surface="plain"
+        density="compact"
+        tone={censoredWeeks > 0 ? "amber" : "neutral"}
+        icon={<HistoryIcon />}
+        label="History"
+        value={`${series.history.length} wks`}
+        pill={
+          censoredWeeks > 0 ? (
+            <Pill variant="amber" tabular>
+              {censoredWeeks} censored
+            </Pill>
+          ) : undefined
+        }
+        detail={
+          censoredWeeks === 0 ? (
+            <>
+              Realised weeks behind the horizon. None of them ran below{" "}
+              {(AVAILABILITY_FLOOR * 100).toFixed(0)}% availability, so nothing
+              on this series is demand-censored and every week on the axis is a
+              measurement rather than a floor.
+            </>
+          ) : (
+            <>
+              Realised weeks behind the horizon.{" "}
+              <span className="tabular-nums">{censoredWeeks}</span> of them ran
+              below {(AVAILABILITY_FLOOR * 100).toFixed(0)}% availability: the
+              shelf was empty, so sales are a floor on demand rather than a
+              measurement of it. Those weeks can be greyed on the chart, and
+              they are why the model&apos;s target is recovered unconstrained
+              demand instead of what was sold.
+            </>
+          )
+        }
+        href="#chart-notes"
+        hrefLabel="See which weeks, and why"
+      />
+
+      {coveragePct === null || calibrationFolds === 0 ? (
+        <KpiCard
+          variant="inline"
+          surface="plain"
+          density="compact"
+          tone="green"
+          icon={<BandIcon />}
+          label="Interval"
+          value="P10-P90"
+          detail={`No calibrated coverage figure is stored for ${brandId}, so the band is drawn without one rather than described by a number this page invented.`}
+        />
+      ) : (
+        <KpiCard
+          variant="inline"
+          surface="plain"
+          density="compact"
+          tone="green"
+          icon={<BandIcon />}
+          label="Interval"
+          value="P10-P90"
+          /* The fold count travels with the number so the caveat cannot be
+             separated from the figure by a screenshot. */
+          pill={
+            <Pill variant="up" tabular>
+              {coveragePct.toFixed(1)}%, {calibrationFolds} folds
+            </Pill>
+          }
+          detail={
+            <>
+              The measured share of realised weeks the band actually caught
+              {nominalPct === null
+                ? ""
+                : `, against ${nominalPct.toFixed(1)}% nominal`}
+              . It rests on{" "}
+              <span className="tabular-nums">{calibrationFolds}</span> folds
+              where the accuracy rests on{" "}
+              <span className="tabular-nums">{accuracyFolds}</span>, and the
+              difference is structural rather than editorial: split conformal
+              calibrates each fold against the one before it, so the first has
+              nothing to calibrate against and is excluded.
+            </>
+          }
+          href="#chart-notes"
+          hrefLabel="See how coverage was measured"
+        />
+      )}
+
+      {accuracy === undefined ? (
+        <KpiCard
+          variant="inline"
+          surface="plain"
+          density="compact"
+          tone="green"
+          icon={<TargetIcon />}
+          label="Forecast accuracy"
+          value="--"
+          detail="No accuracy row is readable in your scope, so nothing is claimed for the model that drew this forecast."
+        />
+      ) : (
+        // Part H: the headline never travels without the seasonal-naive
+        // margin. AccuracyStatement is the only component that renders it.
+        <AccuracyStatement
+          accuracy={accuracy}
+          variant="card"
+          cardVariant="inline"
+          cardSurface="plain"
+          cardDensity="compact"
+          cardBasis
+          icon={<TargetIcon />}
+          href="#benchmarks"
+          hrefLabel="See it against both benchmarks"
+        />
+      )}
+    </div>
+  );
 
   return (
     <>
-      <PageHeader eyebrow="Demand planning" title="Workbench" kpis={kpis}>
-        {accuracy === undefined ? null : (
-          // Part H: the headline never travels without the seasonal-naive
-          // margin. AccuracyStatement is the only component that renders it.
-          <AccuracyStatement accuracy={accuracy} variant="inline" />
-        )}
-      </PageHeader>
+      <PageHeader
+        eyebrow="Demand planning"
+        title="Workbench"
+        tagline="Forecast clearly. Decide confidently."
+        rail={
+          <>
+            History {BAR} Horizon {BAR} Evidence
+          </>
+        }
+        band={headerCards}
+      />
 
       {modelVersion === null || generatedAt === null ? null : (
         <ModelStrip
@@ -513,9 +748,11 @@ export default async function WorkbenchPage({
           // confidence band, and inventing one here would be the exact move
           // this strip exists to make impossible.
           //
-          // accuracyPct is deliberately NOT passed: it would print the
-          // headline on its own, which Part H forbids. The accuracy lives in
-          // <AccuracyStatement/>, above and to the right, with its benchmark.
+          // `accuracy` is deliberately NOT passed. The prop takes a whole
+          // AccuracyHeadline, so passing it could not break Part H -- the
+          // margin would travel with the headline. It is left off because the
+          // statement already stands in the header band directly above this
+          // line, and a second copy two rows down is noise, not provenance.
           why={
             <>
               <p>
@@ -632,7 +869,13 @@ export default async function WorkbenchPage({
             history={chartHistory}
             forward={chartForward}
           >
-            <div className="mt-[14px] flex flex-col gap-[10px] border-t border-rule pt-[14px]">
+            {/* Where the header's History and Interval cards send a reader.
+                Both figures are stated as pills up there and argued in full
+                here, and neither card had anywhere to point before. */}
+            <div
+              id="chart-notes"
+              className="mt-[14px] flex scroll-mt-[18px] flex-col gap-[10px] border-t border-rule pt-[14px]"
+            >
               {coveragePct === null || calibrationFolds === 0 ? (
                 <p className="text-[12.5px] leading-[1.6] text-body max-w-[88ch]">
                   No calibrated coverage figure is stored for {brandId}, so the
@@ -674,7 +917,11 @@ export default async function WorkbenchPage({
           </Card>
 
           {accuracy === undefined ? null : (
-            <Card>
+            /* Where the header's accuracy card sends a reader who presses
+               "See it against both benchmarks". A header figure is the
+               summary of an argument made in full further down, and this is
+               that argument. */
+            <Card id="benchmarks" className="scroll-mt-[18px]">
               <CardHeader
                 title="Against the benchmarks"
                 subtitle={

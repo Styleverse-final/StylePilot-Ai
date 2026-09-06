@@ -7,18 +7,24 @@ import { formatCrore, formatCount, plural, seriesLabel } from "./format";
  *
  * Ports `.hero`, `.heroT`, `.circ`, `.darkb` and `.float`.
  *
- * The design reference reads "Six decisions need you / Agents settled 221
- * overnight and escalated six. Those six carry 18.4 Cr." All three of those
- * figures were static mock. Here:
+ * The headline count is the number of recommendations in THIS planner's scope
+ * that carry no decision row at all, counted at request time. A planner scoped
+ * to one region legitimately sees a small number, or zero. Zero is rendered as
+ * a sentence, not as an empty card.
  *
- *   - the headline count is the number of recommendations in THIS planner's
- *     scope that carry no decision row at all, counted at request time;
- *   - the value is the sum of value_at_stake_inr over exactly those rows;
- *   - the overnight line is agent_acted / agent_escalated from
- *     v_touchless_rate, which moves every time the agents run.
+ * WHAT THIS CARD USED TO SAY, AND WHY IT STOPPED
+ * ---------------------------------------------
+ * It carried a paragraph: what the agents settled and escalated, and what the
+ * open rows are worth. Every one of those figures is now stated in the KPI
+ * band directly above it, and the agents panel beside it draws the same
+ * partition as a bar. Three statements of one fact in the first screenful is
+ * not emphasis, it is noise, and the reader has to check whether the three
+ * agree before trusting any of them.
  *
- * A planner scoped to one region legitimately sees a small number, or zero.
- * Zero is rendered as a sentence, not as an empty card.
+ * The one thing the band does NOT say survives here: that some open rows
+ * carry no value figure at all, so the money total covers fewer rows than the
+ * count. That line renders only when it is true, because a caveat that is
+ * always on screen stops being read.
  */
 
 const HERO_GRADIENT =
@@ -37,16 +43,8 @@ export type HeroHighlight = {
 export type HeroBriefProps = {
   /** Recommendations in scope with no decision logged. */
   openCount: number;
-  /** Sum of value_at_stake_inr across exactly those rows. Null when none carry one. */
-  openValueInr: number | null;
   /** How many of those rows carry no value figure, so the sum is not the whole story. */
   openWithoutValue: number;
-  /** v_touchless_rate.agent_acted -- what the agents closed without a human. */
-  agentActed: number | null;
-  /** v_touchless_rate.agent_escalated -- what they handed back. */
-  agentEscalated: number | null;
-  /** v_touchless_rate.in_scope_denominator -- what they were allowed to touch. */
-  inScopeDenominator: number | null;
   /** The single highest-value open row, surfaced as the float card. */
   highlight: HeroHighlight | null;
   /** Deep link for the primary action. */
@@ -58,11 +56,7 @@ const DARK_BUTTON =
 
 export function HeroBrief({
   openCount,
-  openValueInr,
   openWithoutValue,
-  agentActed,
-  agentEscalated,
-  inScopeDenominator,
   highlight,
   queueHref,
 }: HeroBriefProps) {
@@ -98,36 +92,18 @@ export function HeroBrief({
         </span>
       </div>
 
-      <p
-        className="mt-[8px] text-[11.5px] font-semibold leading-[1.5]"
-        style={{ color: "#8A6A55" }}
-      >
-        {agentActed === null || agentEscalated === null ? (
-          <>The agents have not run against your scope yet, so nothing has been settled automatically.</>
-        ) : (
-          <>
-            Agents settled {formatCount(agentActed)} of the{" "}
-            {formatCount(inScopeDenominator)} in their scope and escalated{" "}
-            {formatCount(agentEscalated)}.
-          </>
-        )}{" "}
-        {hasWork ? (
-          <>
-            The {formatCount(openCount)} open in your scope carry{" "}
-            {formatCrore(openValueInr)}
-            {openWithoutValue > 0 ? (
-              <>
-                {" "}
-                across the {formatCount(openCount - openWithoutValue)} that
-                carry a value figure
-              </>
-            ) : null}
-            .
-          </>
-        ) : (
-          <>Every recommendation in your scope already carries a decision.</>
-        )}
-      </p>
+      {openWithoutValue > 0 ? (
+        <p
+          className="mt-[8px] text-[11.5px] font-semibold leading-[1.5]"
+          style={{ color: "#8A6A55" }}
+        >
+          {formatCount(openWithoutValue)} of them carry no value figure, so the
+          money beside the count covers{" "}
+          {formatCount(openCount - openWithoutValue)}
+          {plural(openCount - openWithoutValue, " row", " rows")}, not all of
+          them.
+        </p>
+      ) : null}
 
       <Link href={queueHref} className={DARK_BUTTON}>
         <span aria-hidden="true">+</span>
@@ -135,7 +111,7 @@ export function HeroBrief({
       </Link>
 
       {highlight === null ? null : (
-        <div className="mt-auto rounded-inner bg-white p-[14px] shadow-card">
+        <div className="mt-[14px] rounded-inner bg-white p-[14px] shadow-card">
           <div className="flex items-center justify-between gap-[8px]">
             <div className="text-[12.5px] font-extrabold text-ink">
               {seriesLabel(highlight.seriesKey)}

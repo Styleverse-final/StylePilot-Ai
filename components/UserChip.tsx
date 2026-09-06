@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { buttonClasses } from "./Button";
 
@@ -32,6 +32,19 @@ export type UserChipProps = {
    * cannot fall out of use behind another.
    */
   signOutEndpoint?: string;
+  /**
+   * Optional controlled open state. Omit both and the chip owns its own, which
+   * is what it did before and what any future consumer gets for free.
+   *
+   * TopNav supplies them because it now has TWO popovers -- this menu and the
+   * More dropdown -- and they were independent: opening one left the other
+   * hanging over the bar. Coordinating them needs one owner of "which, if any,
+   * is open", and the only component that can see both is their parent. The
+   * alternative, having each close the other, means two components reaching
+   * into each other to do what one already sitting above them can decide.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 const FALLBACK_NAME = "Account";
@@ -51,12 +64,31 @@ export function UserChip({
   name,
   role,
   signOutEndpoint = "/auth/signout",
+  open,
+  onOpenChange,
 }: UserChipProps) {
   const displayName = name?.trim() ? name.trim() : FALLBACK_NAME;
   const initials = initialsFrom(displayName);
 
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Controlled when `open` is supplied, uncontrolled otherwise. The internal
+  // state is declared either way -- hooks cannot be conditional -- and simply
+  // goes unread in the controlled case.
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const controlled = open !== undefined;
+  const menuOpen = controlled ? open : uncontrolledOpen;
+  // useCallback so the effect below can depend on it honestly rather than
+  // suppressing the warning: a fresh closure per render would re-attach both
+  // document listeners on every render while the menu is open.
+  const setMenuOpen = useCallback(
+    (value: boolean) => {
+      if (!controlled) setUncontrolledOpen(value);
+      onOpenChange?.(value);
+    },
+    [controlled, onOpenChange],
+  );
+
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
 
   useEffect(() => {
@@ -65,7 +97,13 @@ export function UserChip({
       if (!rootRef.current?.contains(event.target as Node)) setMenuOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key !== "Escape") return;
+      // Escape closed the menu but left focus on whatever the reader had
+      // tabbed to inside it, which is a node that is about to be removed --
+      // focus then falls back to <body> and the next Tab restarts from the top
+      // of the document. Put it back on the trigger, where they were.
+      setMenuOpen(false);
+      triggerRef.current?.focus();
     };
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -73,20 +111,21 @@ export function UserChip({
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [menuOpen]);
+  }, [menuOpen, setMenuOpen]);
 
   const signOutClass = buttonClasses("default", "sm", "w-full justify-center");
 
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         className={AVATAR_CLASS}
         aria-label={`Account menu for ${displayName}`}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
-        aria-controls={menuId}
-        onClick={() => setMenuOpen((value) => !value)}
+        aria-controls={menuOpen ? menuId : undefined}
+        onClick={() => setMenuOpen(!menuOpen)}
       >
         {initials}
       </button>

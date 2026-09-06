@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { AccuracyStatement, Card, CardBody, ModelStrip, PageHeader } from "@/components";
-import type { KpiItem } from "@/components";
+import {
+  AccuracyStatement,
+  Card,
+  CardBody,
+  KpiCard,
+  ModelStrip,
+  PageHeader,
+  Pill,
+} from "@/components";
 import type { ModelConfidence } from "@/components/ModelStrip";
 import { BuyTable } from "@/components/buy/BuyTable";
 import { SafetyStockNote } from "@/components/buy/SafetyStockNote";
@@ -20,6 +27,13 @@ import {
   formatTimestamp,
   formatUnits,
 } from "@/components/buy/format";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  BarsIcon,
+  RupeeIcon,
+  TargetIcon,
+} from "@/components/buy/icons";
 import { isOpenHold, type BuyRow } from "@/components/buy/types";
 import { getAccuracyHeadline, type AccuracyHeadline } from "@/lib/accuracy";
 import { getPolicyParameters, getRecommendations } from "@/lib/queries";
@@ -51,35 +65,56 @@ export const metadata: Metadata = {
  * quantities are committed, rather than in a governance tab.
  */
 
-/** Fold the visible rows into the header KPIs. Nothing is typed in by hand. */
-function headerKpis(rows: readonly BuyRow[]): KpiItem[] {
-  const reduce = rows.filter((row) => row.action === "REDUCE_BUY").length;
-  const increase = rows.filter((row) => row.action === "INCREASE_BUY").length;
+/** The separator in the two rails, at the head of the page and its foot. */
+const BAR = String.fromCharCode(0x2502); // box drawings light vertical
 
+/**
+ * The header figures, folded out of the visible rows. Nothing is typed in by
+ * hand, and every one of them counts the WHOLE scope: the table's chips,
+ * search and filters narrow what is listed, never what is counted here.
+ */
+type HeaderFigures = {
+  reduce: number;
+  increase: number;
+  /** Net movement as a share of the manual plan, or null with no plan to compare. */
+  netFraction: number | null;
+  netDelta: number;
+  valueTotal: number;
+  /** How many rows carry a value at stake, and how many carry a manual plan. */
+  valued: number;
+  compared: number;
+};
+
+function headerFigures(rows: readonly BuyRow[]): HeaderFigures {
   let netDelta = 0;
   let manualTotal = 0;
   let valueTotal = 0;
+  let valued = 0;
+  let compared = 0;
+
   for (const row of rows) {
     if (typeof row.deltaUnits === "number") netDelta += row.deltaUnits;
-    if (typeof row.manualUnits === "number") manualTotal += row.manualUnits;
-    if (typeof row.valueAtStakeInr === "number") valueTotal += row.valueAtStakeInr;
+    if (typeof row.manualUnits === "number") {
+      manualTotal += row.manualUnits;
+      compared += 1;
+    }
+    if (typeof row.valueAtStakeInr === "number") {
+      valueTotal += row.valueAtStakeInr;
+      valued += 1;
+    }
   }
 
-  // A share of the manual plan, not an average of percentages: averaging the
-  // per-row gaps would weight a 400-unit series the same as a 90,000-unit one.
-  const netFraction = manualTotal > 0 ? netDelta / manualTotal : null;
-
-  return [
-    { label: "Reduce", value: formatUnits(reduce) },
-    { label: "Increase", value: formatUnits(increase) },
-    {
-      label: "Net units vs manual",
-      value: formatSignedFractionPct(netFraction),
-      pill: `${formatSignedUnits(netDelta)} units`,
-      tone: netFraction === null ? "grey" : netFraction < 0 ? "down" : "up",
-    },
-    { label: "Value at stake", value: formatInr(valueTotal) },
-  ];
+  return {
+    reduce: rows.filter((row) => row.action === "REDUCE_BUY").length,
+    increase: rows.filter((row) => row.action === "INCREASE_BUY").length,
+    // A share of the manual plan, not an average of percentages: averaging the
+    // per-row gaps would weight a 400-unit series the same as a 90,000-unit one.
+    netFraction: manualTotal > 0 ? netDelta / manualTotal : null,
+    netDelta,
+    valueTotal,
+    valued,
+    compared,
+  };
 }
 
 /**
@@ -142,6 +177,40 @@ function Explain({ children }: { children: ReactNode }) {
   );
 }
 
+/** A short orange rule, the mark that opens both rails. */
+function RailMark() {
+  return (
+    <span
+      aria-hidden="true"
+      className="h-[2px] w-[24px] flex-none rounded-pill bg-orange"
+    />
+  );
+}
+
+/**
+ * The foot of the page: what this screen is for on the left, the three
+ * things a buy quantity moves on the right.
+ *
+ * It is decoration in the sense that it carries no figure, and it is not in
+ * the sense that it closes the page the way the header opens it -- the same
+ * micro uppercase register, the same orange mark, at the other end. Nothing
+ * that a planner needs to act is stated only here.
+ */
+function FooterRail() {
+  return (
+    <div className="mt-[18px] flex flex-wrap items-center justify-between gap-x-[18px] gap-y-[10px] px-[8px] pb-[8px] text-micro font-extrabold uppercase text-mute">
+      <span className="flex items-center gap-[11px]">
+        <RailMark />
+        Data-driven plans. Stronger seasons.
+      </span>
+      <span className="flex items-center gap-[11px]">
+        <RailMark />
+        Demand {BAR} Inventory {BAR} Profitability
+      </span>
+    </div>
+  );
+}
+
 export default async function BuyPage() {
   await redirectCmpoToPortfolio();
   const planner = await getSessionPlanner();
@@ -150,7 +219,14 @@ export default async function BuyPage() {
   if (!brandId) {
     return (
       <>
-        <PageHeader eyebrow="Buy quantity recommendations" title="Buy plan" />
+        <PageHeader
+          eyebrow="Buy quantity recommendations"
+          title={
+            <>
+              Buy <span className="text-orange">plan</span>
+            </>
+          }
+        />
         <Explain>
           You are signed in, but your account is not linked to a planner
           record, so there is no brand to scope a buy plan to. Every
@@ -194,6 +270,7 @@ export default async function BuyPage() {
   const serviceLevel = policy(parameters, "service_level");
   const coverage = policy(parameters, "interval_coverage_calibrated");
   const spreadFactor = policy(parameters, "safety_spread_factor");
+  const figures = headerFigures(rows);
 
   // Provenance comes from the rows that were actually rendered. With no rows
   // there is nothing to stamp, so the strip falls back to the registry entry
@@ -213,27 +290,172 @@ export default async function BuyPage() {
     generatedAt ?? accuracy?.generatedAt ?? null,
   );
 
+  /*
+    FIVE CARDS, NOT A FLAT KPI ROW, AND ON THEIR OWN LINE.
+
+    The flat row is right for a screen whose header carries reference figures
+    a planner glances at. This screen commits money, and the five measures
+    here are the ones that decide whether it is worth opening the table at
+    all -- how many series move each way, what the net movement is against the
+    plan being replaced, what is on the line, and how well the model that
+    produced all of it has scored.
+
+    They sit in the band under the title rather than beside it because five
+    cards squeezed between a title and the Ask button get about 165px each,
+    which is not enough for "Net units vs manual" or a crore figure to stay on
+    one line. Given the full width they each get around 260px and every label,
+    value and pill reads across without wrapping.
+
+    Each card keeps its caveat behind its own disclosure rather than dropping
+    it: the denominator of the net figure, how many rows carry a price, and
+    the full accuracy comparison are all one press away.
+
+    The five tracks are not equal, and not equal in three different ways.
+    "Reduce" and "Increase" are a short word over a two-digit count, so they
+    take about two thirds of a share. The net figure takes the most: its
+    label is the longest on the strip and its value carries a six-digit unit
+    pill that has to sit BESIDE the percentage, not under it -- a pill that
+    wraps is what makes one card taller than the four beside it. Accuracy is
+    next for the same reason, with a shorter pill. Value at stake needs only
+    a label and a crore figure and takes the least of the three. The tracks
+    still sum to 5, so the strip spans exactly what an even split did.
+
+    Part H still holds, and is why the accuracy card is rendered by
+    AccuracyStatement rather than by a KpiCard here: that component cannot
+    draw the headline without the seasonal-naive margin beside it, and no
+    accuracy percentage is written as a literal in this file.
+  */
+  const headerBand = (
+      <div className="grid grid-cols-[0.68fr_0.68fr_1.36fr_1.06fr_1.22fr] gap-[12px] max-[1180px]:grid-cols-3 max-[760px]:grid-cols-2">
+        <KpiCard
+          variant="inline"
+          surface="plain"
+          tone="red"
+          icon={<ArrowDownIcon />}
+          label="Reduce"
+          value={formatUnits(figures.reduce)}
+          detail={
+            <>
+              Series where the recommended buy sits below the manual plan.
+              The count is of series in your scope, not of units: a reduction
+              on one large series can outweigh several small increases, which
+              is what the net figure two cards along is for.
+            </>
+          }
+        />
+
+        <KpiCard
+          variant="inline"
+          surface="plain"
+          tone="green"
+          icon={<ArrowUpIcon />}
+          label="Increase"
+          value={formatUnits(figures.increase)}
+          detail={
+            <>
+              Series where the recommended buy sits above the manual plan.
+              Increases and reductions need not sum to the row count: a
+              series the model holds at the planned quantity is neither.
+            </>
+          }
+        />
+
+        <KpiCard
+          variant="inline"
+          surface="plain"
+          tone="violet"
+          icon={<BarsIcon />}
+          label="Net units vs manual"
+          value={formatSignedFractionPct(figures.netFraction)}
+          pill={
+            figures.netFraction === null ? undefined : (
+              <Pill
+                variant={
+                  figures.netDelta < 0
+                    ? "down"
+                    : figures.netDelta > 0
+                      ? "up"
+                      : "grey"
+                }
+                tabular
+              >
+                {formatSignedUnits(figures.netDelta)} units
+              </Pill>
+            )
+          }
+          detail={
+            <>
+              The summed movement as a share of the summed manual plan across
+              the {formatUnits(figures.compared)}{" "}
+              {figures.compared === 1 ? "series" : "series"} in your scope
+              that carry one -- not the mean of the per-row gaps, which would
+              weight a 400-unit series the same as a 90,000-unit one.
+              {figures.netFraction === null
+                ? " No row in scope carries a manual plan, so there is no denominator and no percentage is claimed."
+                : ""}
+            </>
+          }
+        />
+
+        <KpiCard
+          variant="inline"
+          surface="plain"
+          tone="amber"
+          icon={<RupeeIcon />}
+          label="Value at stake"
+          value={formatInr(figures.valueTotal)}
+          detail={
+            <>
+              Summed over the {formatUnits(figures.valued)} of{" "}
+              {formatUnits(rows.length)} rows in your scope that carry a value
+              at stake. Rows priced at nothing are counted in the list and not
+              in this total, which is why the two figures can differ.
+            </>
+          }
+        />
+
+        {accuracy === null ? (
+          <KpiCard
+            variant="inline"
+            surface="plain"
+            tone="green"
+            icon={<TargetIcon />}
+            label="Forecast accuracy"
+            value="--"
+            detail="No accuracy row is readable in your scope, so nothing is claimed for the model that produced these quantities."
+          />
+        ) : (
+          <AccuracyStatement
+            accuracy={accuracy}
+            variant="card"
+            cardVariant="inline"
+            cardSurface="plain"
+            icon={<TargetIcon />}
+          />
+        )}
+      </div>
+  );
+
   return (
     <>
       <PageHeader
         eyebrow="Buy quantity recommendations"
-        title="Buy plan"
-        kpis={headerKpis(rows)}
-      >
-        {/*
-          COMPACT, NOT REMOVED. Part H still holds: the compact variant renders
-          the headline and the seasonal-naive margin on one line, together, and
-          puts the fold count, MASE and the manual comparison behind a
-          disclosure. What Part H protects is the headline never appearing
-          alone, and it still cannot.
-        */}
-        {accuracy ? (
-          <AccuracyStatement accuracy={accuracy} variant="compact" />
-        ) : null}
-      </PageHeader>
+        title={
+          <>
+            Buy <span className="text-orange">plan</span>
+          </>
+        }
+        tagline="Plan smarter. Stock better. Grow faster."
+        rail={
+          <>
+            Insights {BAR} Actions {BAR} Impact
+          </>
+        }
+        band={headerBand}
+      />
 
       {/*
-        THE TWO THRESHOLD BANNERS MOVED BELOW THE TABLE.
+        THE TWO THRESHOLD BANNERS SIT BELOW THE TABLE.
 
         Neither was cut. The service level derivation and the safety-stock
         calibration note are the reason the quantities in the table are what
@@ -256,7 +478,7 @@ export default async function BuyPage() {
           this screen to the brand, region and categories on your planner
           record, and a planner scoped to one region will often see none in a
           week when the model and the manual plan agree across it. The
-          thresholds above still apply to your brand and are shown so the
+          thresholds below still apply to your brand and are shown so the
           screen stays honest about what it would be committing against.
         </Explain>
       ) : (
@@ -300,6 +522,8 @@ export default async function BuyPage() {
           </>
         }
       />
+
+      <FooterRail />
     </>
   );
 }
