@@ -34,12 +34,8 @@ import {
   formatTimestamp,
   plural,
 } from "@/components/learning/format";
-import {
-  HoursProgress,
-  NextModule,
-  SegmentWhy,
-} from "@/components/learning/JourneyPanels";
-import { ModuleSequence } from "@/components/learning/ModuleSequence";
+import { SegmentWhy } from "@/components/learning/JourneyPanels";
+import { LearningHub } from "@/components/learning/LearningHub";
 import {
   OverrideScatter,
   overrideShare,
@@ -331,15 +327,17 @@ export default async function LearningPage() {
             is the only thing anyone does with these rows.
           </Banner>
 
-          <div className="mb-[16px] grid grid-cols-[1.25fr_1fr] items-start gap-[16px] max-[1140px]:grid-cols-1">
-            <NextModule journey={journey} />
-            <HoursProgress journey={journey} />
-          </div>
-
-          <div className="grid grid-cols-[1.35fr_1fr] items-start gap-[16px] max-[1140px]:grid-cols-1">
-            <ModuleSequence journey={journey} />
-            <SegmentWhy journey={journey} />
-          </div>
+          {/*
+            LearningHub carries what NextModule, HoursProgress and
+            ModuleSequence used to carry between them: the one thing to do
+            next, hours done against hours on the path, and every module with
+            its state, score and unlocks_capability. All three read this same
+            journey object, so rendering the hub beside them would have put
+            each module on the screen twice. SegmentWhy stays -- it answers a
+            different question, which is why this path and not another.
+          */}
+          <LearningHub journey={journey} />
+          <SegmentWhy journey={journey} />
         </>
       ) : (
         <Explain>
