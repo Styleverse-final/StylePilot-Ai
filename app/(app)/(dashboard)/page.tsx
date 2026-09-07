@@ -31,7 +31,6 @@ import {
   routeForRecType,
 } from "@/components/dashboard/PrioritisedActions";
 import {
-  CalendarIcon,
   CoinsIcon,
   HourglassIcon,
   PointerIcon,
@@ -172,32 +171,6 @@ function coverageFor(rows: readonly RecommendationState[]): DriverCoverage {
     openCount: rows.length,
     openValueInr: priced === 0 ? null : sumValue(rows),
   };
-}
-
-/**
- * The generated-at stamp, as its own card at the top right.
- *
- * It used to be the tail of the eyebrow line, where it read as a subtitle to
- * the screen name. It is not a subtitle: it is the single fact that tells a
- * reader whether anything below is worth acting on this morning, and it is
- * stated even when it is missing, because "no stamp" is itself a warning.
- */
-function StampCard({ stamp }: { stamp: string | null }) {
-  return (
-    <div className="flex items-center gap-[9px] rounded-inner bg-white px-[12px] py-[7px] shadow-raised">
-      <span aria-hidden="true" className="text-mute">
-        <CalendarIcon />
-      </span>
-      <span className="block">
-        <span className="block text-micro font-extrabold uppercase text-mute">
-          Rows generated
-        </span>
-        <span className="block text-small font-extrabold tabular-nums text-ink">
-          {stamp ? `${stamp} IST` : "not stated on these rows"}
-        </span>
-      </span>
-    </div>
-  );
 }
 
 export default async function DashboardPage({
@@ -383,7 +356,6 @@ export default async function DashboardPage({
           </>
         }
         strapline={`Insights ${ARROW} Impact ${ARROW} Growth`}
-        aside={<StampCard stamp={stamp} />}
         band={
           <div className="grid grid-cols-4 gap-[12px] max-[1140px]:grid-cols-2">
             {/* Part H: never the headline on its own. The card variant is the
