@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   AccuracyStatement,
   Banner,
+  Why,
   Card,
   CardBody,
   CardHeader,
@@ -551,20 +552,28 @@ export default async function ScenariosPage({
               <div className="mt-[2px] text-[14px] font-extrabold tabular-nums text-ink">
                 {formatInr(economics.holdingCostPerUnitWeekInr)} per unit-week
               </div>
-              <p className="mt-[5px] text-[11.5px] leading-[1.6] text-body">
-                Read out of{" "}
-                <span className="font-mono text-[11px]">
-                  {sources.holdingCostParam ?? "policy_parameter"}
-                </span>
-                , whose override reason prices the cover ceiling against it. The
-                exceptions screen prints that same sentence verbatim, so the two
-                screens cannot drift:
-              </p>
-              {sources.holdingCostSentence === null ? null : (
-                <p className="mt-[6px] rounded-quote bg-shell px-[12px] py-[9px] text-[11.5px] leading-[1.55] text-body">
-                  {sources.holdingCostSentence}
-                </p>
-              )}
+              <div className="mt-[5px]">
+                <Why
+                  lead={
+                    <>
+                      Read out of{" "}
+                      <span className="font-mono text-[11px]">
+                        {sources.holdingCostParam ?? "policy_parameter"}
+                      </span>
+                    </>
+                  }
+                  label="source"
+                >
+                  Its override reason prices the cover ceiling against this
+                  rate. The exceptions screen prints that same sentence
+                  verbatim, so the two screens cannot drift:
+                  {sources.holdingCostSentence === null ? null : (
+                    <span className="mt-[6px] block rounded-quote bg-shell px-[12px] py-[9px] leading-[1.55] text-body">
+                      {sources.holdingCostSentence}
+                    </span>
+                  )}
+                </Why>
+              </div>
             </div>
 
             <div className="pt-[12px]">
@@ -574,7 +583,16 @@ export default async function ScenariosPage({
               <div className="mt-[2px] text-[14px] font-extrabold tabular-nums text-ink">
                 {formatInr(economics.clearanceCostPerUnitInr)} per unit
               </div>
-              <p className="mt-[5px] text-[11.5px] leading-[1.6] text-body">
+              <div className="mt-[5px]">
+                <Why
+                  lead={
+                    <>
+                      Average selling price {"×"} markdown depth -- the
+                      newsvendor cost of being long one unit
+                    </>
+                  }
+                  label="derivation"
+                >
                 The cover-ceiling row publishes{" "}
                 <span className="tabular-nums">
                   {sources.breakevenWeeks?.toFixed(2) ?? DASH}
@@ -586,26 +604,32 @@ export default async function ScenariosPage({
                 of being long one unit, and the number the markdown column is
                 priced at. The service-level row states the same quantity in
                 words:
-              </p>
-              {sources.serviceLevelBasis === null ? null : (
-                <p className="mt-[6px] rounded-quote bg-shell px-[12px] py-[9px] text-[11.5px] leading-[1.55] text-body">
-                  {sources.serviceLevelBasis}
-                </p>
-              )}
+                {sources.serviceLevelBasis === null ? null : (
+                  <span className="mt-[6px] block rounded-quote bg-shell px-[12px] py-[9px] leading-[1.55] text-body">
+                    {sources.serviceLevelBasis}
+                  </span>
+                )}
+                </Why>
+              </div>
             </div>
 
             {sources.spreadFactorComputed === null ||
             sources.spreadFactorApplied === null ||
             sources.spreadFactorComputed === sources.spreadFactorApplied ? null : (
               <div className="mt-[12px] border-t border-rule pt-[12px] text-[11.5px] leading-[1.6] text-mute">
-                <b className="text-ink">
-                  The safety factor in force is not the one the arithmetic
-                  derives.
-                </b>{" "}
-                The plan applies {sources.spreadFactorApplied} where the
-                derivation gives {sources.spreadFactorComputed}, and that gap is
-                what the lost-sales column is measuring the cost of.{" "}
-                {sources.spreadFactorOverride ?? ""}
+                <Why
+                  lead={
+                    <b className="text-ink">
+                      The safety factor in force is not the one the arithmetic
+                      derives
+                    </b>
+                  }
+                >
+                  The plan applies {sources.spreadFactorApplied} where the
+                  derivation gives {sources.spreadFactorComputed}, and that gap
+                  is what the lost-sales column is measuring the cost of.{" "}
+                  {sources.spreadFactorOverride ?? ""}
+                </Why>
               </div>
             )}
           </CardBody>

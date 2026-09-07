@@ -1,4 +1,5 @@
 import { Pill } from "@/components/Pill";
+import { Why } from "@/components/Why";
 
 import { formatUnits } from "./format";
 import type { CategoryBase } from "./model";
@@ -112,48 +113,58 @@ export function ElasticityCard({ bases }: ElasticityCardProps) {
       </div>
 
       <div className="border-t border-rule px-[20px] py-[16px] text-[11.5px] leading-[1.65] text-body">
-        <p className="max-w-[96ch]">
-          {illustrationFit === null || illustration === null ? (
-            <>
-              No category in this selection carries a fitted coefficient, so
-              there is no worked example to read one off -- and a coefficient
-              from somewhere else would be teaching the shape of a price
-              response this selection does not have.
-            </>
-          ) : (
-            <>
-              {illustration.categoryName}&apos;s coefficient of{" "}
-              <span className="tabular-nums">
-                {illustrationFit.coefficient.toFixed(3)}
-              </span>{" "}
-              in the table above means a 1% cut in the realised price buys
-              about{" "}
-              <span className="tabular-nums">
-                {Math.abs(illustrationFit.coefficient).toFixed(2)}%
-              </span>{" "}
-              more units.
-            </>
-          )}{" "}
-          The sign is the economics: the regressor is log(1 - depth), so a
-          deeper cut makes it more negative and only a NEGATIVE coefficient
-          describes a price response at all. Promotions whose outcome had not
-          yet happened were excluded from the fit, which is why the promotion
-          counts are smaller than the number of promotions on the books.
-        </p>
-        <p className="mt-[7px] max-w-[96ch]">
-          The last column is the stored p50 demand this fit is applied to. It is
-          not the plan: the plan adds the safety stock the buy screen already
-          commits, so every plan-unit figure elsewhere on this screen is larger
-          than the demand shown here by exactly that much.
-        </p>
-        <p className="mt-[7px] max-w-[96ch]">
-          Where a row is marked <b className="text-ink">Pooled</b>, the
-          category&apos;s own regression did not clear the pipeline&apos;s
-          defensibility floor and it ships the brand-wide coefficient instead.
-          Its own R{"²"} is left on the row so the substitution can be
-          checked rather than taken on trust, and every result on this screen
-          that used it is flagged.
-        </p>
+        {/*
+          THREE PARAGRAPHS BECAME ONE LEAD AND A TOGGLE. Each was a different
+          reader's question -- how do I read the coefficient, why is the demand
+          column smaller than the plan, what does Pooled mean -- and stacked
+          inline they were a wall under a table that already answers the first
+          question for anyone who can read a negative number.
+
+          The worked example stays visible because it is the one sentence that
+          teaches the table; the rest is available on a click.
+        */}
+        <Why
+          lead={
+            illustrationFit === null || illustration === null ? (
+              "No category here carries a fitted coefficient, so there is no worked example"
+            ) : (
+              <>
+                {illustration.categoryName}&apos;s coefficient of{" "}
+                <span className="tabular-nums">
+                  {illustrationFit.coefficient.toFixed(3)}
+                </span>{" "}
+                means a 1% price cut buys about{" "}
+                <span className="tabular-nums">
+                  {Math.abs(illustrationFit.coefficient).toFixed(2)}%
+                </span>{" "}
+                more units
+              </>
+            )
+          }
+          label="how to read this"
+        >
+          <span className="block max-w-[96ch]">
+            The sign is the economics: the regressor is log(1 - depth), so a
+            deeper cut makes it more negative and only a NEGATIVE coefficient
+            describes a price response at all. Promotions whose outcome had not
+            yet happened were excluded from the fit, which is why the promotion
+            counts are smaller than the number of promotions on the books.
+          </span>
+          <span className="mt-[7px] block max-w-[96ch]">
+            The last column is the stored p50 demand this fit is applied to. It
+            is not the plan: the plan adds the safety stock the buy screen
+            already commits, so every plan-unit figure elsewhere on this screen
+            is larger than the demand shown here by exactly that much.
+          </span>
+          <span className="mt-[7px] block max-w-[96ch]">
+            Where a row is marked <b className="text-ink">Pooled</b>, the
+            category&apos;s own regression did not clear the pipeline&apos;s
+            defensibility floor and it ships the brand-wide coefficient instead.
+            Its own R{"²"} is left on the row so the substitution can be
+            checked rather than taken on trust, and every result on this screen
+            that used it is flagged.
+          </span>
+        </Why>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { Pill } from "@/components/Pill";
+import { Why } from "@/components/Why";
 
 import {
   formatFractionPct,
@@ -123,10 +124,11 @@ export function Levers({
         <div className="mt-[7px]">
           <Pill variant="violet">Fitted per category</Pill>
         </div>
-        <p className={NOTE_CLASS}>
-          Moves the realised price against the plan&apos;s own point, and the
-          demand response is the fitted curve read as a ratio, so the intercept
-          cancels and the coefficient is the whole of it.
+        <div className={NOTE_CLASS}>
+          <Why lead="Moves the realised price against the plan's own point">
+            The demand response is the fitted curve read as a ratio, so the
+            intercept cancels and the coefficient is the whole of it.
+          </Why>
           {/* The model's own predicate, not the sign of one lever. A price
               rise under a promotion deep enough to swallow it lands below the
               plan price and is no extrapolation at all; the realised price is
@@ -143,7 +145,7 @@ export function Levers({
               extrapolation and is shown as one rather than hidden.
             </>
           ) : null}
-        </p>
+        </div>
       </div>
 
       {/* --------------------------------------------- promotion depth */}
@@ -173,12 +175,20 @@ export function Levers({
         <div className="mt-[7px]">
           <Pill variant="violet">Same curve as markdown timing</Pill>
         </div>
-        <p className={NOTE_CLASS}>
-          log(uplift) = intercept + coefficient {"×"} log(1 - depth), fitted
-          per category on promotions whose outcome had already happened. The
-          slider stops at {formatFractionPct(CURVE_DEPTH_CEILING, 0)} because
-          that is the ceiling the pipeline solves the curve over -- a case
-          premise about how far the fit may be pushed, not a measured limit.
+        <div className={NOTE_CLASS}>
+          <Why
+            lead={
+              <>
+                log(uplift) = intercept + coefficient {"×"} log(1 - depth),
+                fitted per category
+              </>
+            }
+          >
+            Fitted on promotions whose outcome had already happened. The slider
+            stops at {formatFractionPct(CURVE_DEPTH_CEILING, 0)} because that is
+            the ceiling the pipeline solves the curve over -- a case premise
+            about how far the fit may be pushed, not a measured limit.
+          </Why>
           {isPriceFractionClamped(levers) ? (
             <>
               {" "}
@@ -194,7 +204,7 @@ export function Levers({
               price rather than two.
             </>
           ) : null}
-        </p>
+        </div>
       </div>
 
       {/* --------------------------------------------- marketing index */}
@@ -228,7 +238,16 @@ export function Levers({
               : "Assumption, not a fit"}
           </Pill>
         </div>
-        <p className={NOTE_CLASS}>
+        <div className={NOTE_CLASS}>
+          <Why
+            lead={
+              marketing.checked
+                ? marketing.marketingFeatures.length > 0
+                  ? "The model does list a marketing feature, so this lever should be re-derived"
+                  : "Checked against the model, not assumed: no marketing feature on it"
+                : "The registry row is not readable in your scope, so this is treated as an assumption"
+            }
+          >
           {marketing.checked ? (
             marketing.marketingFeatures.length > 0 ? (
               <>
@@ -267,7 +286,8 @@ export function Levers({
               evidence is unavailable.
             </>
           )}
-        </p>
+          </Why>
+        </div>
       </div>
 
       {/* ---------------------------------------------- capacity cap */}
@@ -308,32 +328,41 @@ export function Levers({
           />
           Apply a capacity cap
         </label>
-        <p className={NOTE_CLASS}>
+        <div className={NOTE_CLASS}>
           {capacityUnits === null ? (
-            <>
-              Off. With no cap the plan is whatever the levers above ask for,
-              which is the right default: a constraint you did not impose should
+            <Why lead="Off. The plan is whatever the levers above ask for">
+              Which is the right default: a constraint you did not impose should
               never quietly shape the answer.
-            </>
+            </Why>
           ) : (
-            <>
-              A ceiling of <b className="text-ink">{formatUnits(capacityUnits)}</b>{" "}
-              units over {horizonWeeks} weeks, applied pro rata across the plan.
-              This lever runs no curve: units above the ceiling simply cannot be
-              made, and they land in lost sales.
-            </>
+            <Why
+              lead={
+                <>
+                  A ceiling of{" "}
+                  <b className="text-ink">{formatUnits(capacityUnits)}</b> units
+                  over {horizonWeeks} weeks
+                </>
+              }
+            >
+              Applied pro rata across the plan. This lever runs no curve: units
+              above the ceiling simply cannot be made, and they land in lost
+              sales.
+            </Why>
           )}
-        </p>
+        </div>
       </div>
 
       {/* ------------------------------------------------- fit summary */}
       <div className="border-t border-rule pt-[13px] text-[11px] font-semibold leading-[1.6] text-mute">
-        <b className="text-ink">
-          {fitted.length} of {bases.length}{" "}
-          {bases.length === 1 ? "category" : "categories"} in this selection
-          carry a fitted curve
-        </b>
-        <br />
+        <Why
+          lead={
+            <b className="text-ink">
+              {fitted.length} of {bases.length}{" "}
+              {bases.length === 1 ? "category" : "categories"} carry a fitted
+              curve
+            </b>
+          }
+        >
         {pooled.length > 0 ? (
           <>
             {pooled.map((base) => base.categoryName).join(", ")}{" "}
@@ -360,6 +389,7 @@ export function Levers({
         The ends of these sliders are a range to explore in, not a limit the
         data measured. The one exception is the promotion depth ceiling, which
         is where the pipeline stops solving the curve.
+        </Why>
       </div>
     </div>
   );
