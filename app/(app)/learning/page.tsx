@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import {
-  Banner,
   Card,
   CardBody,
   ModelStrip,
@@ -34,7 +33,6 @@ import {
   formatTimestamp,
   plural,
 } from "@/components/learning/format";
-import { SegmentWhy } from "@/components/learning/JourneyPanels";
 import { LearningHub } from "@/components/learning/LearningHub";
 import {
   OverrideScatter,
@@ -312,32 +310,15 @@ export default async function LearningPage() {
         </Explain>
       ) : journey ? (
         <>
-          <Banner
-            variant="violet"
-            icon="i"
-            title="A path, not a checklist"
-            measureCh={96}
-          >
-            There are no due dates on this screen because there are none in the
-            data, and adding one would turn a curriculum into something to fail
-            against. Your path was sized from two answers you gave in the
-            adoption survey, and the modules on it are ordered so each one is
-            usable before the next begins. Progress is recorded so somebody can
-            pair you with a Champion who has already been through it -- which
-            is the only thing anyone does with these rows.
-          </Banner>
-
           {/*
             LearningHub carries what NextModule, HoursProgress and
             ModuleSequence used to carry between them: the one thing to do
             next, hours done against hours on the path, and every module with
             its state, score and unlocks_capability. All three read this same
             journey object, so rendering the hub beside them would have put
-            each module on the screen twice. SegmentWhy stays -- it answers a
-            different question, which is why this path and not another.
+            each module on the screen twice.
           */}
           <LearningHub journey={journey} />
-          <SegmentWhy journey={journey} />
         </>
       ) : (
         <Explain>
@@ -351,19 +332,14 @@ export default async function LearningPage() {
         </Explain>
       )}
 
-      {!isManager ? (
-        <div className="mt-[16px]">
-          <Explain>
-            Completion across the cohort -- by segment, wave, region and role,
-            with the people a Champion pairing would help most -- is visible to
-            planning managers and above. That is enforced by row level security
-            on the completion table rather than by this page: your session
-            reads your own rows, and a manager&apos;s reads their brand. What
-            this screen holds for you is your own path, and it is not a subset
-            of somebody else&apos;s view of you.
-          </Explain>
-        </div>
-      ) : rollupError ? (
+      {/*
+        A planner used to get a paragraph here explaining that the cohort
+        roll-up exists and belongs to their manager. True, and it is the
+        row-level-security rule working -- but it described a screen they
+        cannot open, on the screen that is theirs. The absence needs no
+        caption; managers still get the roll-up below.
+      */}
+      {!isManager ? null : rollupError ? (
         <div className="mt-[16px]">
           <Explain>
             The cohort roll-up could not be read: {rollupError}. Anything above
