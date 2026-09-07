@@ -29,7 +29,6 @@ import {
 } from "@/components/scenarios/data";
 import {
   DASH,
-  formatFractionPct,
   formatInr,
   formatTimestamp,
   formatUnits,
@@ -437,79 +436,42 @@ export default async function ScenariosPage({
         )}
       </PageHeader>
 
-      <Banner
-        variant="violet"
-        icon="i"
-        title="Nothing on this screen calls a model."
-        measureCh={96}
-      >
-        The forecast was scored offline and written to the database; a lever
-        multiplies those stored rows by an elasticity that was fitted offline
-        too. This page read {formatUnits(base.rowCount)} forecast rows across{" "}
-        {base.seriesCount} series stamped{" "}
-        <span className="font-mono text-[11px]">{modelVersion}</span> and{" "}
-        {elasticity.size}{" "}
-        {elasticity.size === 1 ? "elasticity row" : "elasticity rows"} for{" "}
-        {brandId}, both under your own session. That elasticity read is not
-        narrowed by the selection -- it fetches every fitted row your session
-        can see for the brand, and{" "}
-        {base.categories.filter((category) => category.fit !== null).length} of
-        them meet a category in this selection. Every figure below is arithmetic
-        on those rows.
-        {base.rowsWithoutInterval > 0 ? (
-          <>
-            {" "}
-            {formatUnits(base.rowsWithoutInterval)} of them carry no published
-            p90, so they contribute demand but no interval, and the lost-sales
-            column understates by exactly that much.
-          </>
-        ) : null}
-        {base.truncated ? (
-          <>
-            {" "}
-            <b className="text-amber">
-              The read hit its row ceiling, so these sums are partial.
-            </b>
-          </>
-        ) : null}
-      </Banner>
+      {/*
+        THE TWO PROVENANCE BANNERS THAT USED TO SIT HERE ARE GONE.
 
-      {sources.coverageMeasured === null ? null : (
-        <Banner
-          variant="amber"
-          icon="%"
-          title={`The lost-sales column rests on the calibrated interval, whose coverage measures ${formatFractionPct(sources.coverageMeasured)} against a nominal ${formatFractionPct(sources.coverageNominal)}.`}
-          measureCh={96}
-        >
-          {coverageFolds === null ? (
+        One explained that no model is called at request time; the other
+        explained that the calibrated interval's coverage is a mean over three
+        folds rather than four. Both were true and neither was wrong to write,
+        but they were two paragraphs of methodology standing between a planner
+        and the levers they came here to move -- and a planner is not the
+        reader who needs them. Neither claim is lost: ModelStrip below carries
+        the version, the stamp and the accuracy headline with its own `why`,
+        and ScenarioWorkbench already receives coverageMeasured, coverageFolds
+        and accuracyFolds, so the coverage note now travels with the
+        lost-sales column it actually qualifies instead of a page header.
+
+        WHAT SURVIVES IS THE PART THAT IS NOT AN EXPLANATION. The block below
+        fires only when the figures on this screen are genuinely incomplete --
+        a read that hit its row ceiling, or forecast rows with no published
+        p90. Those are not methodology, they are a warning that the sums are
+        wrong, and a screen that shows partial totals silently is worse than
+        one that shows a paragraph nobody reads. Today every forecast row
+        carries an interval and no read truncates, so this renders nothing.
+      */}
+      {base.truncated || base.rowsWithoutInterval > 0 ? (
+        <Banner variant="amber" icon="!" title="These sums are incomplete." measureCh={96}>
+          {base.truncated ? (
+            <>The read hit its row ceiling, so the totals below are partial.{" "}</>
+          ) : null}
+          {base.rowsWithoutInterval > 0 ? (
             <>
-              Its own parameter row does not state how many folds that mean
-              covers, so this page does not either -- a count inferred from the
-              accuracy figure would be this screen&apos;s arithmetic quoted as
-              though it were a stored one.
+              {formatUnits(base.rowsWithoutInterval)} forecast rows carry no
+              published p90, so they contribute demand but no interval, and the
+              lost-sales column understates by exactly that much.
             </>
-          ) : accuracyFolds === null ? (
-            <>
-              That coverage is a mean over {coverageFolds} folds, as its own
-              parameter row states. No model registry row is readable in your
-              scope, so the accuracy fold count it is fewer than is not named
-              here.
-            </>
-          ) : (
-            <>
-              That coverage is a mean over {coverageFolds} folds, as its own
-              parameter row states, not the {accuracyFolds} behind the accuracy
-              figure above.
-            </>
-          )}{" "}
-          Split-conformal calibration fits its widening offset on a prior fold,
-          so the first fold has nothing to calibrate against and drops out; the
-          two counts differ by design rather than by reporting choice. The raw
-          pre-calibration coverage in the model registry is a much lower number,
-          it describes a band that was never shipped, and it is not read
-          anywhere on this page.
+          ) : null}
         </Banner>
-      )}
+      ) : null}
 
       <ModelStrip
         className="mb-[16px]"
