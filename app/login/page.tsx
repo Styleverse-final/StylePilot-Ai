@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import type { AuthError } from '@supabase/supabase-js'
 
 import { createServerSupabaseClient, getSupabaseEnv } from '@/lib/session'
+import { LogoLockup } from '@/components/Logo'
 import LoginForm, { type LoginState } from './LoginForm'
 
 const jakarta = Plus_Jakarta_Sans({
@@ -13,8 +14,8 @@ const jakarta = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'Sign in - StyleVerse AI',
-  description: 'Sign in to the StyleVerse AI planning workspace.',
+  title: 'Sign in - StylePilot Ai',
+  description: 'Sign in to the StylePilot Ai planning workspace.',
 }
 
 const FALLBACK_PATH = '/'
@@ -61,7 +62,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <style dangerouslySetInnerHTML={{ __html: LOGIN_CSS }} />
       <div className="lv-card">
         <div className="lv-mark">
-          StyleVerse<span>AI</span>
+          <LogoLockup size={30} />
         </div>
         <p className="lv-context">
           Decisions you commit are recorded against this account.
@@ -287,8 +288,7 @@ const LOGIN_CSS = `
   width:100%;max-width:380px;background:#FFF;border-radius:22px;
   padding:30px 28px 24px;box-shadow:0 6px 18px rgba(122,72,38,.10);
 }
-.lv-mark{font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.2}
-.lv-mark span{color:#D04A02}
+.lv-mark{display:flex;align-items:center}
 .lv-context{margin-top:7px;font-size:12px;font-weight:600;color:#8D857D;line-height:1.5}
 .lv-form{margin-top:24px;display:flex;flex-direction:column;gap:14px}
 .lv-error{

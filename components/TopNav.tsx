@@ -17,6 +17,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { SPARK, useCopilot } from "./CopilotDrawer";
+import { LogoLockup } from "./Logo";
 import { NavSheet } from "./NavSheet";
 import { UserChip } from "./UserChip";
 import { ChevronIcon, iconFor } from "./navIcons";
@@ -27,9 +28,9 @@ import { isActive, navFor, type NavItem } from "./navItems";
 /**
  * TopNav
  *
- * A sticky white pill bar: wordmark left, the role's tabs centred with a
- * hairline divider between the tiers, then the copilot trigger and account
- * chip right.
+ * A sticky white pill bar: the mark and wordmark left, the role's tabs
+ * centred with a hairline divider between the tiers, then the copilot
+ * trigger and account chip right.
  *
  * Active state comes from usePathname(), not from props, so a tab lights up
  * on navigation without any page having to declare which one it is.
@@ -476,10 +477,10 @@ export function TopNav({ exceptionCount, user }: TopNavProps) {
     <header className="sticky top-[12px] z-40 flex items-center gap-[14px] rounded-pill bg-white py-[8px] pl-[18px] pr-[10px] shadow-nav">
       <Link
         href="/"
-        className="text-logo font-extrabold whitespace-nowrap text-ink"
-        aria-label="StyleVerse AI, go to dashboard"
+        className="flex items-center"
+        aria-label="StylePilot Ai, go to dashboard"
       >
-        StyleVerse<span className="text-orange">AI</span>
+        <LogoLockup size={24} />
       </Link>
 
       <nav

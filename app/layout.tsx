@@ -31,7 +31,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: `StyleVerse AI ${EM_DASH} Intelligent Merchandising & Planning`,
+  title: `StylePilot Ai ${EM_DASH} Intelligent Merchandising & Planning`,
   description:
     "Forecasting, buy, allocation, markdown and governance for fashion retail planning.",
 };

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { LogoLockup } from "./Logo";
 import { CloseIcon, MenuIcon, iconFor } from "./navIcons";
 import { isActive, type NavItem } from "./navItems";
 
@@ -259,9 +260,7 @@ export function NavSheet({
             className="fixed right-[12px] top-[12px] z-50 w-[calc(100vw-24px)] max-w-[340px] max-h-[calc(100vh-24px)] overflow-y-auto rounded-card bg-white p-[8px] shadow-card"
           >
             <div className="flex items-center justify-between px-[10px] py-[6px]">
-              <span className="text-logo font-extrabold text-ink">
-                StyleVerse<span className="text-orange">AI</span>
-              </span>
+              <LogoLockup size={22} />
               <button
                 ref={closeRef}
                 type="button"
