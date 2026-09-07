@@ -9,6 +9,7 @@ import { DataTable, type Column, type SortDirection } from "@/components/DataTab
 import { DriverBars } from "@/components/DriverBars";
 import { Pill, type PillVariant } from "@/components/Pill";
 import { Stat, StatBlock } from "@/components/StatBlock";
+import { firstClause } from "@/components/clause";
 
 import { DecisionComparison } from "./DecisionComparison";
 import { DecisionControls } from "./DecisionControls";
@@ -311,6 +312,7 @@ export function BuyTable({ rows, holdNote }: BuyTableProps) {
     const owner = latestDecision(row);
     const ownerRole = owner ? humaniseRole(owner.plannerRole) : null;
 
+
     return (
       <div
         id="buy-detail-panel"
@@ -366,8 +368,16 @@ export function BuyTable({ rows, holdNote }: BuyTableProps) {
               <h5 className="text-[14px] font-extrabold tracking-[-0.01em] text-ink">
                 Why this recommendation
               </h5>
+              {/*
+                THE WHOLE RATIONALE, ALWAYS VISIBLE. The collapsed row now
+                carries the lead clause in its own Why column, which is what
+                makes the queue scannable -- but this panel is the one place a
+                planner has deliberately opened to read the entire argument,
+                and putting a toggle in front of it would hide the reasoning at
+                the exact moment it was asked for.
+              */}
               <p className="mt-[6px] max-w-[80ch] text-copy leading-[1.6] text-body">
-                {row.rationale || "No rationale was recorded on this row."}
+                {row.rationale ?? "No rationale was recorded on this row."}
               </p>
             </div>
             {row.drivers.length > 0 ? (
@@ -438,6 +448,52 @@ export function BuyTable({ rows, holdNote }: BuyTableProps) {
                 tabular={false}
               />
             </StatBlock>
+
+            {/*
+              WHAT VALUE AT STAKE ACTUALLY IS, WHICH THIS SCREEN NEVER SAID.
+
+              It is not a priority score and not the cost of the buy: it is the
+              money the pipeline says riding on accepting this recommendation
+              instead of the manual plan, and the arithmetic differs by
+              direction.
+
+              A SECOND "gap revenue" STAT WAS BUILT HERE AND REMOVED. Checked
+              against the seeded rows, value_at_stake / (|delta| x asp) is
+              EXACTLY 1.0000 on all 102 INCREASE_BUY rows and 0.298-0.304 -- the
+              brand's markdown depth -- on all 72 REDUCE_BUY rows. So on an
+              increase the two figures are the same number to the rupee, and
+              printing both under copy claiming they answer different questions
+              would have stated one quantity twice and been wrong about it.
+              Naming the existing figure is the honest version of the same fix.
+            */}
+            <p className="mt-[10px] max-w-[70ch] text-small font-semibold leading-[1.55] text-mute">
+              <b className="text-ink">Value at stake</b>{" "}
+              {row.action === "REDUCE_BUY" ? (
+                <>
+                  is the discount given away on the surplus: the{" "}
+                  <span className="tabular-nums">
+                    {formatSignedUnits(row.deltaUnits)}
+                  </span>{" "}
+                  unit gap at{" "}
+                  <span className="tabular-nums">{formatInr(row.aspInr)}</span>{" "}
+                  each, taken down by the brand&apos;s markdown depth, because
+                  units bought over plan are modelled as clearing at a cut
+                  rather than at list.
+                </>
+              ) : (
+                <>
+                  is the demand that goes unserved if the manual plan stands:
+                  the{" "}
+                  <span className="tabular-nums">
+                    {formatSignedUnits(row.deltaUnits)}
+                  </span>{" "}
+                  unit gap at the payload&apos;s own{" "}
+                  <span className="tabular-nums">{formatInr(row.aspInr)}</span>{" "}
+                  selling price. Revenue, with no cost or margin netted against
+                  it.
+                </>
+              )}
+            </p>
 
             <div className="mt-[16px] border-t border-rule pt-[14px]">
               {/* Keyed by row: the prefilled quantity and the reason are
@@ -558,6 +614,32 @@ export function BuyTable({ rows, holdNote }: BuyTableProps) {
         const pill = actionPill(row.action);
         return <Pill variant={pill.variant}>{pill.label}</Pill>;
       },
+    },
+    {
+      /*
+        WHY THIS ROW, ON THE ROW ITSELF.
+
+        A planner working the queue top down had ten numbers and no reason
+        for any of them until they opened a row: the argument lived entirely
+        in the expansion, so triage meant expanding rows to find out which
+        ones were worth expanding. The exception queue already solved this
+        with the same shared splitter, and this column is that column.
+
+        It is the FIRST CLAUSE and it is clamped to one line on purpose. The
+        cell is a way to decide which row to open, not a place to read the
+        rationale; the full string is unchanged in the panel, one click away.
+        The width is capped on the span rather than the cell because a td in
+        an auto-layout table treats a width as a suggestion, and an
+        unconstrained clause would push the two pinned columns off a laptop.
+      */
+      key: "rationale",
+      header: "Why",
+      headerClassName: "w-[190px]",
+      cell: (row) => (
+        <span className="max-w-[190px] text-[11.5px] font-semibold leading-[1.5] text-mute line-clamp-1">
+          {firstClause(row.rationale).head}
+        </span>
+      ),
     },
     {
       key: "value",

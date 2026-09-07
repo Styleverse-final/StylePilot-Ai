@@ -44,6 +44,24 @@ export function formatInr(value: number | null | undefined): string {
   return `${sign}${RUPEE}${formatUnitsAbs(abs)}`;
 }
 
+/**
+ * INR with an explicit sign, for a rupee figure that can fall either way.
+ *
+ * formatInr already prints a minus, but not a plus, which is right for a
+ * total that is only ever a magnitude. A gap priced at ASP is not that: it is
+ * a reduction as often as it is an increase, and a rupee figure with no
+ * leading sign reads as money coming in whichever direction the buy moved.
+ * The sign is taken before the magnitude is formatted so the crore/lakh cut
+ * never has to reason about a negative.
+ */
+export function formatSignedInr(value: number | null | undefined): string {
+  if (!finite(value)) return DASH;
+  const magnitude = formatInr(Math.abs(value));
+  if (value > 0) return `+${magnitude}`;
+  if (value < 0) return `-${magnitude}`;
+  return magnitude;
+}
+
 /** Units, Indian-grouped, rounded to whole garments. */
 export function formatUnits(value: number | null | undefined): string {
   if (!finite(value)) return DASH;

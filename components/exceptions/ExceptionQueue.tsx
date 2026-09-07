@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Card } from "../Card";
 import { Chip } from "../Chip";
 import { ExceptionTableRow } from "./ExceptionTableRow";
-import { formatCount } from "./format";
+import { breachWeeks, formatCount } from "./format";
 import { SearchIcon, SlidersIcon } from "./icons";
 import type { ExceptionView } from "./types";
 
@@ -72,6 +72,13 @@ export type ExceptionQueueProps = {
   rows: readonly ExceptionView[];
   /** Names the scope in the empty-state sentence, e.g. "SpeedStyle". */
   scopeLabel: string;
+  /**
+   * recommendation.id a deep link asked to land on, or null. It opens one
+   * row; it filters nothing and it changes no order. An id that is not among
+   * `rows` -- stale, or outside this session's scope -- simply matches
+   * nothing, which is why there is no "not found" branch anywhere below.
+   */
+  initialOpenId?: number | null;
 };
 
 function matches(row: ExceptionView, filter: Filter): boolean {
@@ -107,33 +114,36 @@ function haystack(row: ExceptionView): string {
     .toLowerCase();
 }
 
-/**
- * How far past its threshold the row sits, in weeks.
- *
- * An overstock is above its ceiling and a stockout below its floor, so the
- * subtraction runs the other way for each; the result is positive in both
- * cases and the two are therefore comparable. A row missing either number
- * has no distance and sorts to the end rather than being treated as zero,
- * which would put an unmeasured row among the well-behaved ones.
- */
-function breachWeeks(row: ExceptionView): number | null {
-  const projected = row.projectedWos;
-  const threshold = row.threshold?.weeks ?? null;
-  if (projected === null || threshold === null) return null;
-  return row.isStockout ? threshold - projected : projected - threshold;
-}
+// breachWeeks() used to live here, where only the sort could see it -- so the
+// queue could be ordered by a distance the rows never printed. It is now in
+// ./format beside the spellings, imported above by this file for the sort and
+// applied on the server for the figure each row shows, which is the same
+// function reaching both.
 
 function severityRank(row: ExceptionView): number {
   return row.severity === null ? 0 : (SEVERITY_RANK[row.severity] ?? 0);
 }
 
-export function ExceptionQueue({ rows, scopeLabel }: ExceptionQueueProps) {
+export function ExceptionQueue({
+  rows,
+  scopeLabel,
+  initialOpenId = null,
+}: ExceptionQueueProps) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("VALUE");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [panelOpen, setPanelOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  // A deep link can name a row that ranks below the fold, and the fold is the
+  // one thing standing between that link and the row it points at. Opening it
+  // unfolds the list -- it hides nothing, filters nothing and reorders
+  // nothing -- and only when the named row is actually there to be reached.
+  // The reader can fold it back with the same button as ever.
+  const [showAll, setShowAll] = useState(
+    () =>
+      initialOpenId !== null &&
+      rows.findIndex((row) => row.id === initialOpenId) >= FOLD,
+  );
 
   const isDefaultOrder = sortKey === "VALUE" && sortDir === "desc";
 
@@ -403,6 +413,7 @@ export function ExceptionQueue({ rows, scopeLabel }: ExceptionQueueProps) {
                     key={row.id ?? `row-${index}`}
                     row={row}
                     rank={index + 1}
+                    initialOpen={row.id !== null && row.id === initialOpenId}
                   />
                 ))}
               </tbody>

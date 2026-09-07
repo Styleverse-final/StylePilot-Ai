@@ -83,6 +83,15 @@ export type BuyRow = {
   deltaUnits: number | null;
   /** A fraction, not a percentage. 0.3212 is 32.1% above the manual plan. */
   deltaPct: number | null;
+  /**
+   * payload.asp_inr -- the average selling price the pipeline priced this
+   * series at. It is here so the expanded row can state the REVENUE the unit
+   * gap represents (deltaUnits x aspInr) rather than leaving a planner to
+   * infer it from a value at stake that answers a different question. It is
+   * a selling price, not a margin: nothing on this screen may net a cost
+   * against it, because no cost is in scope here to net.
+   */
+  aspInr: number | null;
   /** payload.weeks -- the horizon the buy covers. */
   horizonWeeks: number | null;
   serviceTier: string | null;

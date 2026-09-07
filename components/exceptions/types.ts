@@ -53,6 +53,14 @@ export type ExceptionView = {
   /** payload.units_at_risk, as recommend.py wrote it. */
   unitsAtRisk: number | null;
   threshold: ThresholdView | null;
+  /**
+   * Weeks past that threshold, measured on the server with the same
+   * breachWeeks() the queue sorts by -- positive in both directions, because
+   * an overstock is above its ceiling and a stockout below its floor. Null
+   * when either the projection or the threshold is missing, which is a row
+   * with no measured distance rather than a row sitting exactly on the line.
+   */
+  breachWeeks: number | null;
   /** recommendation.rationale, verbatim. Never rewritten in the UI. */
   rationale: string | null;
   modelVersion: string | null;
@@ -67,6 +75,26 @@ export type ExceptionView = {
   accountablePlanner: string | null;
   acceptedValue: number | null;
   overrideReason: string | null;
+
+  /**
+   * THE BRAND'S RATES, NOT THIS ROW'S NUMBERS.
+   *
+   * readPlanEconomics() resolves these once per request out of
+   * policy_parameter and dim_brand -- the same reader the scenario screen
+   * prices a plan with, so there is exactly one clearance rate and one
+   * holding cost in the codebase -- and they are carried onto every row so
+   * the expansion can say what the row's single INR figure actually buys
+   * back. Nothing here is a figure ABOUT the row; the products the row forms
+   * from them are labelled on screen as derived there rather than stored on
+   * the recommendation, and any one of these being null makes the figure that
+   * needed it a dash.
+   */
+  /** dim_brand.gross_margin, as a fraction. */
+  grossMargin: number | null;
+  /** INR given away per unit cleared. */
+  clearanceCostPerUnitInr: number | null;
+  /** INR to hold one unit for one week. */
+  holdingCostPerUnitWeekInr: number | null;
 };
 
 /**

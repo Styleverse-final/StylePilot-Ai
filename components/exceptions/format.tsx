@@ -96,3 +96,37 @@ export function formatTimestamp(value: string | null | undefined): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : TIMESTAMP.format(parsed);
 }
+
+/**
+ * The two numbers a breach distance is measured between.
+ *
+ * Structural rather than ExceptionView so the server page can measure the
+ * distance while it is still assembling the view, and so this module goes on
+ * importing nothing from the screen it formats for.
+ */
+export type BreachInput = {
+  isStockout: boolean;
+  projectedWos: number | null;
+  threshold: { weeks: number | null } | null;
+};
+
+/**
+ * How far past its threshold the row sits, in weeks.
+ *
+ * This is the one exception to "nothing here decides a value", and it earns
+ * the place: the queue sorts by this distance and the row prints it, so both
+ * have to be the same subtraction. Two copies of it would be two ways for a
+ * row to be second in the list while its printed distance says third.
+ *
+ * An overstock is above its ceiling and a stockout below its floor, so the
+ * subtraction runs the other way for each; the result is positive in both
+ * cases and the two are therefore comparable. A row missing either number
+ * has no distance and sorts to the end rather than being treated as zero,
+ * which would put an unmeasured row among the well-behaved ones.
+ */
+export function breachWeeks(row: BreachInput): number | null {
+  const projected = row.projectedWos;
+  const threshold = row.threshold?.weeks ?? null;
+  if (projected === null || threshold === null) return null;
+  return row.isStockout ? threshold - projected : projected - threshold;
+}

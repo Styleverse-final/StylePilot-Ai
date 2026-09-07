@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { seriesKeyOf } from "@/components/allocation/model";
+
 import {
   Card,
   CardBody,
@@ -9,6 +11,7 @@ import {
   SeriesName,
 } from "@/components";
 import type { Column } from "@/components";
+import { firstClause } from "@/components/clause";
 import type { RecType, RecommendationState } from "@/lib/queries";
 
 import { formatCount, formatCrore, humanise, seriesLabel } from "./format";
@@ -58,6 +61,45 @@ const DESTINATION_LABEL: Record<RecType, string> = {
 
 export function destinationLabel(recType: RecType | null | undefined): string {
   return recType ? DESTINATION_LABEL[recType] : "Exceptions";
+}
+
+/**
+ * The destination for one row, carrying that row's identity with it.
+ *
+ * A link to /exceptions alone lands the reader on the queue and leaves them
+ * to find, by eye, the row they had just clicked -- which on a screen whose
+ * whole argument is "this one first" throws away the ranking at the moment it
+ * matters. The target names the row instead.
+ *
+ * TWO DIFFERENT KEYS, BECAUSE THE TWO SCREENS ADDRESS DIFFERENT THINGS. The
+ * allocation board is not a list of recommendations; it groups them into one
+ * series and decides the whole group together, so ?series= is the only handle
+ * that resolves there (resolveGroup already reads it). Everywhere else a row
+ * IS the unit of decision, so ?rec= carries the recommendation id.
+ *
+ * A row with neither key falls back to the bare route rather than to a
+ * parameter naming nothing -- the queue is still the right place to land.
+ *
+ * NOT recommendation.series_key, FOR ALLOCATION. The stored key is three
+ * segments -- category|channel|region, e.g. "ACCS|D2C|IN-E" -- because a
+ * recommendation is written per region. The allocation board groups regions
+ * into a category x channel cell and decides the cell as a whole, so its own
+ * key is two segments. Passing the stored key would never match, and
+ * resolveGroup falls back to the first group rather than erroring, so the
+ * planner would land silently on the WRONG cell -- the failure mode that looks
+ * like the feature working. The key is therefore rebuilt at the board's own
+ * grain through seriesKeyOf, imported so the two spellings cannot drift.
+ */
+export function hrefForRow(row: RecommendationState): string {
+  const route = routeForRecType(row.rec_type);
+  if (row.rec_type === "ALLOCATION") {
+    return row.category_id === null || row.channel_id === null
+      ? route
+      : `${route}?series=${encodeURIComponent(
+          seriesKeyOf(row.category_id, row.channel_id),
+        )}`;
+  }
+  return row.id === null ? route : `${route}?rec=${row.id}`;
 }
 
 /** Severity drives the pill tone; confidence never does. */
@@ -131,11 +173,43 @@ export function PrioritisedActions({
     {
       key: "rationale",
       header: "Why",
-      cell: (row) => (
-        <span className="block max-w-[52ch] text-[11.5px] font-semibold leading-[1.6] text-mute">
-          {row.rationale ?? "No rationale was written for this row."}
-        </span>
-      ),
+      /**
+       * The first clause, clamped to two lines.
+       *
+       * This cell sets the height of the most important list on the home
+       * screen, and it was setting it from whichever row happened to have the
+       * longest paragraph: a buy rationale runs to about 297 characters
+       * against about 133 for an exception, so one buy row could double the
+       * height of the twelve around it. The reader is scanning for which row
+       * to open, not reading the argument here.
+       *
+       * NOTHING IS REWRITTEN AND NOTHING IS LOST. firstClause cuts on a real
+       * sentence boundary (never between two digits, so "19.7 weeks" survives
+       * intact) and the whole stored string stays on the title attribute, so
+       * the full text is one hover away and the screen that owns the decision
+       * still shows it in full.
+       *
+       * line-clamp-2 carries its own display rule, so no `block` is set
+       * beside it -- the two are competing display utilities and which one
+       * won would depend on stylesheet order, not on this line.
+       */
+      cell: (row) => {
+        if (row.rationale === null) {
+          return (
+            <span className="block max-w-[52ch] text-[11.5px] font-semibold leading-[1.6] text-mute">
+              No rationale was written for this row.
+            </span>
+          );
+        }
+        return (
+          <span
+            title={row.rationale}
+            className="line-clamp-2 max-w-[52ch] text-[11.5px] font-semibold leading-[1.6] text-mute"
+          >
+            {firstClause(row.rationale).head}
+          </span>
+        );
+      },
     },
     {
       key: "value",
@@ -155,6 +229,9 @@ export function PrioritisedActions({
       header: "Decide",
       align: "right",
       headerClassName: "w-[150px]",
+      /* A control, not a line of text: it sits in the middle of a row whose
+         text columns are read from the top. */
+      valign: "middle",
       cell: (row) =>
         row.id === null ? null : (
           <QueueApprove
@@ -167,9 +244,10 @@ export function PrioritisedActions({
       key: "go",
       header: "",
       align: "right",
+      valign: "middle",
       cell: (row) => (
         <Link
-          href={routeForRecType(row.rec_type)}
+          href={hrefForRow(row)}
           className="inline-flex h-[28px] items-center gap-[6px] rounded-pill bg-cream px-[11px] text-[11.5px] font-bold text-ink transition-colors duration-[120ms] hover:bg-hover"
         >
           {destinationLabel(row.rec_type)}
@@ -233,6 +311,12 @@ export function PrioritisedActions({
         <RowLimit visible={VISIBLE_ROWS} total={rows.length}>
           <DataTable
             caption="Open recommendations ranked by value at stake"
+            /* The why column now runs to two lines while the series and the
+               action run to one, so the cells have to start at the same
+               height or the row reads as a ragged pile instead of a line to
+               read across. The two control columns override this back to
+               middle for themselves. */
+            valign="top"
             columns={columns}
             rows={rows}
             rowKey={(row, index) => String(row.id ?? index)}

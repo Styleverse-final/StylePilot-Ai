@@ -27,6 +27,7 @@ import { parseDrivers, parsePayload } from "@/lib/queries";
 import type { RecommendationState } from "@/lib/queries";
 import type { StyleverseClient } from "@/lib/supabase";
 import type { Driver } from "@/components/DriverBars";
+import { featureLabel } from "@/components/driverLabels";
 
 import type { BuyDecision, BuyDecisionStatus, BuyRow } from "./types";
 
@@ -188,9 +189,17 @@ export function toBuyRows(
     const recommendedUnits = payloadNumber(payload, "recommended_buy_units");
     if (recommendedUnits === null) continue;
 
+    // THE FEATURE NAME IS NOT A LABEL. recommendation.drivers carries the
+    // model's own column names -- "lag_52", "rmean_4",
+    // "weather_anomaly_c_lag12" -- and a bar captioned with one of those asks
+    // a planner to read the feature store to find out what moved their buy.
+    // featureLabel is the workbench's translator, imported rather than copied
+    // so /buy and the forecast detail can never describe the same jsonb in two
+    // different vocabularies; anything it does not know still falls through as
+    // the raw name, because an unfamiliar label beats a confident wrong one.
     const parsed = parseDrivers(rec.drivers);
     const drivers: Driver[] = parsed.map((driver) => ({
-      label: driver.feature,
+      label: featureLabel(driver.feature),
       value: driver.contribution_units,
     }));
 
@@ -230,6 +239,13 @@ export function toBuyRows(
       manualUnits: payloadNumber(payload, "manual_units"),
       deltaUnits: payloadNumber(payload, "delta_units"),
       deltaPct: payloadNumber(payload, "delta_pct"),
+      // Carried, not consumed. The price is what turns the unit gap into a
+      // rupee figure a planner can argue with, and dropping it here was why
+      // the screen could show a value at stake without ever showing the
+      // revenue the gap itself represents. It stays null when the payload
+      // carries no price, so the panel renders a dash rather than a product
+      // of a missing number.
+      aspInr: payloadNumber(payload, "asp_inr"),
       horizonWeeks: payloadNumber(payload, "weeks"),
       serviceTier: payloadString(payload, "service_level_tier"),
       decisions: history.get(rec.id) ?? [],

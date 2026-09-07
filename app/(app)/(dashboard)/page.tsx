@@ -28,7 +28,7 @@ import {
 import {
   PrioritisedActions,
   destinationLabel,
-  routeForRecType,
+  hrefForRow,
 } from "@/components/dashboard/PrioritisedActions";
 import {
   CoinsIcon,
@@ -49,6 +49,15 @@ import {
   clearedPerDay,
   touchlessRunSeries,
 } from "@/components/dashboard/trends";
+/* Two label tables, borrowed rather than re-read. Both are documented where
+   they are defined as lookups that turn an id into a name and decide nothing
+   about which rows appear -- dim_brand carries the same read policy as the
+   rows above it, dim_category is readable by any signed-in account -- so
+   naming the reader's scope with them cannot widen it. */
+import {
+  getBrandNames,
+  getCategoryNames,
+} from "@/components/downstream/data";
 import { accuracySentence, getAccuracyHeadline } from "@/lib/accuracy";
 import type { AccuracyHeadline } from "@/lib/accuracy";
 import {
@@ -95,8 +104,17 @@ import { createServerAnonClient } from "@/lib/supabase";
 
 const PORTFOLIO_ROLES = ["cmpo", "group_cmpo"];
 
-/** The separator in the strapline under the title. */
-const ARROW = String.fromCharCode(0x2192);
+/**
+ * How many category names the strapline will spell out before it counts them
+ * instead.
+ *
+ * PageHeader draws a vertical rule between this line and the KPI band, and
+ * the line is uppercase micro, so a scope of six spelled-out categories
+ * crowds the band at the 1140px breakpoint where the header wraps. Past this
+ * many, the count is the honest short form: it is still a number the reader
+ * can check against their own patch.
+ */
+const NAMED_CATEGORIES = 3;
 
 export const metadata: Metadata = {
   title: "Command centre",
@@ -206,6 +224,8 @@ export default async function DashboardPage({
     recommendations,
     valueSummaries,
     embargo,
+    brandNames,
+    categoryNames,
   ]: [
     AccuracyHeadline[],
     ModelRegistryEntry[],
@@ -214,6 +234,8 @@ export default async function DashboardPage({
     RecommendationState[],
     ValueSummary[],
     EmbargoStatus[],
+    Record<string, string>,
+    Record<string, string>,
   ] = await Promise.all([
     getAccuracyHeadline(sb),
     getModelRegistry(sb),
@@ -224,6 +246,13 @@ export default async function DashboardPage({
       : Promise.resolve<RecommendationState[]>([]),
     getValueSummary(sb),
     getEmbargoStatus(sb, brandId ?? undefined),
+    /* Both join the wave rather than running after it, so naming the scope
+       above the title costs no extra round trip in front of the first byte.
+       Each fails soft to {} and every lookup below falls back to the id, so
+       an unreadable label table costs the reader a nicer word, never the
+       fact of whose rows these are. */
+    getBrandNames(sb),
+    getCategoryNames(sb),
   ]);
 
   // ------------------------------------------------------------ accuracy
@@ -269,7 +298,11 @@ export default async function DashboardPage({
           headline: humanise(topRow.action),
           detail: topRow.rationale,
           valueInr: topRow.value_at_stake_inr,
-          href: routeForRecType(topRow.rec_type),
+          /* Carries the row's own identity, not just the destination screen.
+             The hero names one specific decision; landing the reader on the
+             queue that owns it and leaving them to find it again by eye is
+             the part that made this link feel like a menu item. */
+          href: hrefForRow(topRow),
           ctaLabel: `Review ${destinationLabel(topRow.rec_type).toLowerCase()}`,
         };
 
@@ -337,6 +370,50 @@ export default async function DashboardPage({
 
   const stamp = formatStamp(generatedAt);
 
+  // ------------------------------------------------- whose screen this is
+  // The line under the title used to be a three-word agency slogan. It is now
+  // the two things a planner checks before they trust anything below it:
+  // whose rows these are, and when they were generated. Both are read from
+  // this request -- the brand off the session, the categories off the rows
+  // themselves, the stamp off the same generated_at the model strip quotes at
+  // the foot of the page -- so the line cannot drift from the screen it heads.
+  //
+  // WHY THE CATEGORIES COME FROM THE ROWS. SessionPlanner resolves brand and
+  // region but no category list, and row level security has already narrowed
+  // these rows to the categories this planner owns. The distinct category ids
+  // present in them therefore ARE the cut, computed rather than asserted; a
+  // planner whose scope returns nothing gets no category clause at all rather
+  // than an empty one.
+  const scopeCategories = [
+    ...new Set(
+      recommendations
+        .map((row) => row.category_id)
+        .filter(
+          (value): value is string =>
+            typeof value === "string" && value.length > 0,
+        ),
+    ),
+  ]
+    .map((id) => categoryNames[id] ?? id)
+    .sort();
+
+  const scopeLine = [
+    brandId === null
+      ? "no brand on your planner record"
+      : (brandNames[brandId] ?? brandId),
+    scopeCategories.length === 0
+      ? null
+      : scopeCategories.length <= NAMED_CATEGORIES
+        ? scopeCategories.join(", ")
+        : `${formatCount(scopeCategories.length)} categories`,
+    // Never dropped when it is missing. A stamp that is silently absent reads
+    // as a screen with no age at all, which is the one thing a planner cannot
+    // check for themselves.
+    stamp === null ? "generated-at not stated" : `rows generated ${stamp} IST`,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(` ${MIDDOT} `);
+
   // The two recorded series. Both come out of rows already fetched above --
   // the agent runs the activity feed draws, and the recommendations the queue
   // is built from -- so tracking these four measures costs no extra query.
@@ -355,7 +432,7 @@ export default async function DashboardPage({
             Command <span className="text-orange">centre</span>
           </>
         }
-        strapline={`Insights ${ARROW} Impact ${ARROW} Growth`}
+        strapline={scopeLine}
         band={
           <div className="grid grid-cols-4 gap-[12px] max-[1140px]:grid-cols-2">
             {/* Part H: never the headline on its own. The card variant is the

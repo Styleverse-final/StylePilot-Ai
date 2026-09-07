@@ -24,7 +24,6 @@ import type { Json } from "@/lib/database.types";
 import type {
   AutonomyBand,
   CommittedDecisionStatus,
-  DecisionStatus,
   RecAction,
   RecommendationState,
 } from "@/lib/queries";
@@ -77,6 +76,28 @@ export type RegionShift = {
   incumbentUnits: number;
   reallocatedUnits: number;
   sharePp: number;
+  /**
+   * What the moved units are worth, DERIVED ON THIS SCREEN.
+   *
+   * recommendation.value_at_stake_inr is null on every ALLOCATION row, and
+   * that stored null stays null: nothing here writes it back, and any screen
+   * reading the column still correctly reports that an allocation row is not
+   * priced. This field is a different claim -- |reallocatedUnits| x the
+   * demand-weighted selling price the forecast already publishes at
+   * category x channel x region, which IS the grain these rows sit on.
+   *
+   * It is REVENUE THAT TRAVELS WITH THE UNITS, not margin and not
+   * incremental revenue. A reallocation moves demand between regions rather
+   * than creating it, so this figure sizes the movement; it does not
+   * describe a gain. The absolute value is deliberate for the same reason:
+   * the direction is already stated by the signed units beside it, and a
+   * negative rupee figure would read as a loss the model never claimed.
+   *
+   * Null whenever the series carries no published price. There is no
+   * brand-average fallback, because a price borrowed from another series
+   * would be this screen's own invention wearing the clothes of a read.
+   */
+  valueAtStakeInr: number | null;
 };
 
 export type ParsedShifts = {
@@ -86,6 +107,23 @@ export type ParsedShifts = {
 };
 
 /**
+ * The forecast's own grain, category x channel x region.
+ *
+ * Deliberately a second function rather than a wider `seriesKeyOf`: that one
+ * keys the category x channel CELL a planner reallocates across, and one cell
+ * holds several of these. Two keys that look alike and mean different things
+ * are the fastest way to join the wrong price onto the wrong row, so each
+ * spelling lives in exactly one place and both callers use it.
+ */
+export function forecastSeriesKey(
+  categoryId: string,
+  channelId: string,
+  regionId: string,
+): string {
+  return `${categoryId}|${channelId}|${regionId}`;
+}
+
+/**
  * Narrow ALLOCATION recommendations into regional shifts.
  *
  * A row needs an identity, a recommended split, an incumbent split and a
@@ -93,8 +131,16 @@ export type ParsedShifts = {
  * `unreadable` and left off the board rather than defaulted to zero, because
  * a zero would read as "the optimiser proposes no change", which is a claim
  * the data did not make.
+ *
+ * `aspBySeries` is optional and a missing entry is not an error: it prices
+ * the movement where the forecast published a price and leaves it null
+ * everywhere else. A row is never dropped for want of a price -- the units
+ * and the share movement are the decision, and the money is the gloss.
  */
-export function toRegionShifts(rows: RecommendationState[]): ParsedShifts {
+export function toRegionShifts(
+  rows: RecommendationState[],
+  aspBySeries?: ReadonlyMap<string, number>,
+): ParsedShifts {
   const shifts: RegionShift[] = [];
   let unreadable = 0;
 
@@ -116,6 +162,20 @@ export function toRegionShifts(rows: RecommendationState[]): ParsedShifts {
       continue;
     }
 
+    // Read when the optimiser wrote it; otherwise the difference between the
+    // two figures already on screen. Arithmetic on shown values, not an
+    // invented figure. Hoisted out of the literal below because the derived
+    // value is |this| x price and must multiply the same number the row draws.
+    const reallocated =
+      num(row.payload.reallocated_units) ?? recommended - incumbent;
+
+    // The price is looked up, never defaulted. A series the forecast does not
+    // price leaves valueAtStakeInr null and the board shows a dash for it.
+    const aspInr =
+      aspBySeries?.get(
+        forecastSeriesKey(row.category_id, row.channel_id, row.region_id),
+      ) ?? null;
+
     shifts.push({
       id: row.id,
       categoryId: row.category_id,
@@ -133,12 +193,9 @@ export function toRegionShifts(rows: RecommendationState[]): ParsedShifts {
       overrideReason: row.override_reason,
       recommendedUnits: recommended,
       incumbentUnits: incumbent,
-      // Read when the optimiser wrote it; otherwise the difference between
-      // the two figures already on screen. Arithmetic on shown values, not
-      // an invented figure.
-      reallocatedUnits:
-        num(row.payload.reallocated_units) ?? recommended - incumbent,
+      reallocatedUnits: reallocated,
       sharePp,
+      valueAtStakeInr: aspInr === null ? null : Math.abs(reallocated) * aspInr,
     });
   }
 

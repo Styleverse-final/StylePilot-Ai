@@ -1,5 +1,6 @@
 "use client";
 
+import { firstClause } from "@/components/clause";
 import { useState } from "react";
 
 import { Pill, type PillVariant } from "../Pill";
@@ -58,29 +59,6 @@ const STATUS_LABEL: Record<CommittedDecisionStatus, string> = {
 };
 
 /**
- * The first clause of the rationale.
- *
- * Cut at the first sentence boundary that is not a decimal point -- the same
- * rule the copilot's sentence splitter needed, for the same reason: cutting
- * "19.7 weeks" into "19." destroys the number that made the row worth reading.
- */
-function firstClause(text: string): { head: string; rest: string } {
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch !== "." && ch !== ";") continue;
-    const prev = text[i - 1];
-    const next = text[i + 1];
-    if (ch === "." && prev >= "0" && prev <= "9" && next >= "0" && next <= "9") {
-      continue;
-    }
-    if (i > 24) {
-      return { head: text.slice(0, i + 1), rest: text.slice(i + 1).trim() };
-    }
-  }
-  return { head: text, rest: "" };
-}
-
-/**
  * Two digits to 99, then as many as the number needs. The padding holds the
  * column on one width for a queue of the size a queue usually is; it never
  * truncates, so a hundredth row still reads as the hundredth.
@@ -93,10 +71,20 @@ export type ExceptionTableRowProps = {
   row: ExceptionView;
   /** 1-based position in the list as currently ordered and filtered. */
   rank: number;
+  /**
+   * True for the one row a ?rec= deep link named. It seeds the open state and
+   * nothing more: the reader closes it with the same button as any other row,
+   * and every other row still starts collapsed.
+   */
+  initialOpen?: boolean;
 };
 
-export function ExceptionTableRow({ row, rank }: ExceptionTableRowProps) {
-  const [open, setOpen] = useState(false);
+export function ExceptionTableRow({
+  row,
+  rank,
+  initialOpen = false,
+}: ExceptionTableRowProps) {
+  const [open, setOpen] = useState(initialOpen);
 
   const severityClass =
     row.severity === "HIGH"
@@ -106,6 +94,52 @@ export function ExceptionTableRow({ row, rank }: ExceptionTableRowProps) {
         : "bg-rule2";
 
   const clause = row.rationale ? firstClause(row.rationale) : null;
+
+  /*
+    WHAT THE MONEY IS.
+
+    A row states one INR figure, a unit count and a cover reading, and never
+    says what the rupees are the rupees OF. These three say it, and not one of
+    them is a new measurement: each is arithmetic over figures already on the
+    row -- units at risk, the distance past the threshold printed in the cover
+    cell -- times a rate readPlanEconomics() resolved for the brand. They are
+    labelled DERIVED on screen because they are formed here rather than stored
+    on the recommendation, and any missing input makes the figure a dash. A
+    plausible product of a guessed rate is the one thing worse than a dash.
+
+    The carry cost is charged over row.breachWeeks, which for an overstock row
+    IS projected cover minus the ceiling -- the same subtraction, taken from
+    the same function the queue sorts by, so the weeks being charged for are
+    the weeks the row says it is over by.
+  */
+  const units = row.unitsAtRisk;
+  const markdownExposureInr =
+    units === null || row.clearanceCostPerUnitInr === null
+      ? null
+      : units * row.clearanceCostPerUnitInr;
+  // The weeks past the ceiling are the weeks there is anything to charge for.
+  // Where the distance is not positive there are none, and a negative product
+  // would be a carry cost that pays the business back for holding stock; that
+  // is a dash, and the cover cell beside it already says the row is clear of
+  // its ceiling.
+  const carryCostInr =
+    units === null ||
+    row.holdingCostPerUnitWeekInr === null ||
+    row.breachWeeks === null ||
+    row.breachWeeks <= 0
+      ? null
+      : units * row.holdingCostPerUnitWeekInr * row.breachWeeks;
+  const lostMarginInr =
+    row.valueAtStakeInr === null || row.grossMargin === null
+      ? null
+      : row.valueAtStakeInr * row.grossMargin;
+
+  // The provenance line is worth a line only where there is a figure whose
+  // provenance it explains; beside three dashes it would be an explanation of
+  // nothing.
+  const hasDerived = row.isStockout
+    ? lostMarginInr !== null
+    : markdownExposureInr !== null || carryCostInr !== null;
 
   return (
     <>
@@ -165,6 +199,32 @@ export function ExceptionTableRow({ row, rank }: ExceptionTableRowProps) {
               {formatWeeks(row.threshold.weeks)}
             </span>
           )}
+          {/*
+            THE DISTANCE, NOT JUST THE TWO ENDS OF IT. A reader can do the
+            subtraction -- but the queue offers an ordering BY exactly this
+            distance, and an ordering nobody can read off the rows is one they
+            have to take on trust. So it goes as a second line inside the cell
+            the two ends already occupy: no new column, and the distance sits
+            against the pair it was measured from rather than across the table
+            from them.
+          */}
+          {/*
+            THE SIGN IS NOT DECORATION. Not every row is past its threshold: a
+            stockout can be raised because recent availability was low enough
+            that the series sold short while demand was still rising, and that
+            row's projected cover can sit comfortably above its floor. The
+            distance is then negative, and "-1.4w past the floor" would be a
+            sentence saying the opposite of what happened. It says clear of it
+            instead, which is both true and the reason to read the rationale.
+          */}
+          {row.breachWeeks === null ? null : (
+            <span className="mt-[2px] block text-[10.5px] font-semibold text-mute">
+              {row.breachWeeks > 0
+                ? `${formatWeeks(row.breachWeeks)} past the `
+                : `${formatWeeks(Math.abs(row.breachWeeks))} clear of the `}
+              {row.isStockout ? "floor" : "ceiling"}
+            </span>
+          )}
         </td>
 
         <td className="py-[9px] pr-[12px] text-small text-body leading-[1.4]">
@@ -216,7 +276,32 @@ export function ExceptionTableRow({ row, rank }: ExceptionTableRowProps) {
                 />
               )}
               <Stat label="UNITS AT RISK" value={formatUnits(row.unitsAtRisk)} />
+              {row.isStockout ? (
+                <Stat
+                  label="LOST MARGIN (DERIVED)"
+                  value={formatInr(lostMarginInr)}
+                />
+              ) : (
+                <>
+                  <Stat
+                    label="MARKDOWN EXPOSURE (DERIVED)"
+                    value={formatInr(markdownExposureInr)}
+                  />
+                  <Stat
+                    label="CARRY COST PAST CEILING (DERIVED)"
+                    value={formatInr(carryCostInr)}
+                  />
+                </>
+              )}
             </div>
+
+            {hasDerived ? (
+              <p className="mt-[7px] max-w-[92ch] text-small font-semibold leading-[1.55] text-mute">
+                {row.isStockout
+                  ? "Derived on this screen, not stored on the recommendation: the value at stake taken at the brand's gross margin."
+                  : "Derived on this screen, not stored on the recommendation. Both rates are brand-level, so a category whose own selling price sits above or below the brand's is priced against the brand's. The carry figure charges every excess unit for the whole distance past the ceiling, which makes it a ceiling on the cost rather than an expected one -- the same weeks-of-supply reading says the pile depletes as it goes."}
+              </p>
+            ) : null}
 
             {row.status === null ? null : (
               <p className="mt-[9px] max-w-[92ch] text-small font-semibold leading-[1.6] text-mute">

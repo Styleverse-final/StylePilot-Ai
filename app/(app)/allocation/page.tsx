@@ -28,6 +28,7 @@ import {
   MIDDOT,
   allocationBand,
   bandCeilingPp,
+  forecastSeriesKey,
   formatCeiling,
   groupBySeries,
   provenanceOf,
@@ -106,6 +107,116 @@ async function loadLabels(sb: StyleverseClient): Promise<Labels> {
   return labels;
 }
 
+/** PostgREST pages below any plausible max-rows setting. */
+const ASP_PAGE_SIZE = 500;
+/** 108 planning-grain series per brand x 12 horizon weeks = 1,296 at most. */
+const ASP_MAX_PAGES = 20;
+
+/**
+ * The demand-weighted selling price per category x channel x region.
+ *
+ * WHY THIS EXISTS. recommendation.value_at_stake_inr is null on every
+ * ALLOCATION row, and the pipeline's recorded reason was that there is no ASP
+ * on the allocation grain. There is: forecast.avg_selling_price_inr is
+ * published at category x channel x region x week, which is exactly the
+ * series an allocation row sits on. So the money a movement carries can be
+ * DERIVED here. Nothing is written back -- the stored column stays null, and
+ * the screens that read it stay right to say an allocation row is not priced.
+ *
+ * THE WEIGHTING IS THE ONE THE SCENARIO SCREEN ALREADY USES: revenue over
+ * units, sum(forecast_units x price) / sum(forecast_units), so a week the
+ * model expects to sell more in counts for more of the series' price. It is
+ * not a plain mean of the weekly prices, and it is not re-derived some other
+ * way here, because two screens quoting two different "average prices" for
+ * the same series would be the app arguing with itself.
+ *
+ * THE ONE DIFFERENCE, AND WHY. A week with no published price contributes
+ * neither revenue nor units, rather than contributing its units at a price of
+ * zero. The scenario screen can carry the zero because it discloses its own
+ * unpriced-row count beside the total; here the quotient IS the price, and a
+ * zero-priced week would quietly mark the series down for weeks nobody
+ * priced. A series with no priced week at all is simply absent from the map,
+ * and the board draws a dash.
+ *
+ * Read through the caller's anon client, so row level security scopes these
+ * prices the same way it scopes the recommendations they are joined to.
+ */
+async function loadSeriesAsp(
+  sb: StyleverseClient,
+  brandId: string,
+): Promise<Map<string, number>> {
+  const revenue = new Map<string, number>();
+  const units = new Map<string, number>();
+  let from = 0;
+  // Set only when the loop ends by running out of rows. If it ends by hitting
+  // the page cap instead, the map is partial -- every series in the pages that
+  // did arrive would be averaged over part of its horizon, which is the exact
+  // quietly-wrong price the error path above refuses to produce -- so the cap
+  // exits the same way a failure does rather than a different way.
+  let exhausted = false;
+
+  for (let page = 0; page < ASP_MAX_PAGES; page += 1) {
+    const { data, error } = await sb
+      .from("forecast")
+      .select(
+        "category_id, channel_id, region_id, forecast_units, avg_selling_price_inr",
+      )
+      .eq("brand_id", brandId)
+      .order("id", { ascending: true })
+      .range(from, from + ASP_PAGE_SIZE - 1);
+
+    // A failed page abandons the whole derivation rather than pricing the
+    // board off the weeks that happened to arrive first. A price averaged
+    // over half a horizon is not this series' price, and the board degrading
+    // to dashes is honest where a partial average would not be. The rest of
+    // the screen -- the units, the share movement, the band -- is unaffected.
+    if (error) return new Map();
+
+    // Termination is on an EMPTY page, not a short one: a short page means
+    // either "that was the last of them" or "the server caps responses below
+    // the page size", and only one of those is safe to act on.
+    if (data.length === 0) {
+      exhausted = true;
+      break;
+    }
+
+    for (const row of data) {
+      if (
+        row.category_id === null ||
+        row.channel_id === null ||
+        row.region_id === null ||
+        row.avg_selling_price_inr === null ||
+        !Number.isFinite(row.forecast_units) ||
+        row.forecast_units <= 0
+      ) {
+        continue;
+      }
+
+      const key = forecastSeriesKey(
+        row.category_id,
+        row.channel_id,
+        row.region_id,
+      );
+      revenue.set(
+        key,
+        (revenue.get(key) ?? 0) + row.forecast_units * row.avg_selling_price_inr,
+      );
+      units.set(key, (units.get(key) ?? 0) + row.forecast_units);
+    }
+
+    from += data.length;
+  }
+
+  if (!exhausted) return new Map();
+
+  const asp = new Map<string, number>();
+  for (const [key, weight] of units) {
+    const total = revenue.get(key);
+    if (weight > 0 && total !== undefined) asp.set(key, total / weight);
+  }
+  return asp;
+}
+
 function isBrandId(value: string | null): value is BrandId {
   return value === "SPD" || value === "ECO";
 }
@@ -141,14 +252,16 @@ export default async function AllocationPage({ searchParams }: PageProps) {
   }
 
   const sb = await createServerAnonClient();
-  const [recommendations, bands, accuracies, labels] = await Promise.all([
-    getRecommendations(sb, brandId, "ALLOCATION"),
-    getAutonomyBands(sb, brandId),
-    getAccuracyHeadline(sb, isBrandId(brandId) ? brandId : undefined),
-    loadLabels(sb),
-  ]);
+  const [recommendations, bands, accuracies, labels, aspBySeries] =
+    await Promise.all([
+      getRecommendations(sb, brandId, "ALLOCATION"),
+      getAutonomyBands(sb, brandId),
+      getAccuracyHeadline(sb, isBrandId(brandId) ? brandId : undefined),
+      loadLabels(sb),
+      loadSeriesAsp(sb, brandId),
+    ]);
 
-  const { shifts, unreadable } = toRegionShifts(recommendations);
+  const { shifts, unreadable } = toRegionShifts(recommendations, aspBySeries);
   const band = allocationBand(bands);
   const ceilingPp = bandCeilingPp(band);
   const counts = tally(shifts, ceilingPp);

@@ -19,12 +19,18 @@ import {
 } from "@/components/exceptions/icons";
 import { ThresholdBanner } from "@/components/exceptions/ThresholdBanner";
 import { TouchlessBanner } from "@/components/exceptions/TouchlessBanner";
-import { formatCount, formatInr } from "@/components/exceptions/format";
+import {
+  breachWeeks,
+  formatCount,
+  formatInr,
+} from "@/components/exceptions/format";
 import type {
   CeilingView,
   ExceptionView,
   SeverityLevel,
 } from "@/components/exceptions/types";
+import { readPlanEconomics } from "@/components/scenarios/data";
+import type { PlanEconomics } from "@/components/scenarios/model";
 import {
   getAccuracyHeadline,
   type AccuracyHeadline,
@@ -247,10 +253,36 @@ function resolvePolicies(
   return { ceilings, floorWeeks, basisFor };
 }
 
+/**
+ * max(horizon_week) across the forecast rows this session may read.
+ *
+ * readPlanEconomics() will not hand back rates without a horizon, because the
+ * screen it was written for prices a plan over one. This screen prices nothing
+ * over a horizon and uses none of it -- but the way to satisfy that reader is
+ * to read the horizon, not to type a plausible twelve into the call. One row,
+ * ordered, so the answer is the same on every request; where the read comes
+ * back empty the rates resolve to null and every derived figure on the rows
+ * degrades to a dash rather than to a number nobody can source.
+ */
+async function readHorizonWeeks(
+  sb: StyleverseClient,
+  brandId: string,
+): Promise<number> {
+  const { data } = await sb
+    .from("forecast")
+    .select("horizon_week")
+    .eq("brand_id", brandId)
+    .order("horizon_week", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.horizon_week ?? 0;
+}
+
 function toExceptionView(
   row: RecommendationState,
   labels: Labels,
   policy: ResolvedPolicy,
+  economics: PlanEconomics | null,
 ): ExceptionView {
   const payload: RecommendationPayload = row.payload;
   const isStockout = row.action === "STOCKOUT_RISK";
@@ -273,6 +305,8 @@ function toExceptionView(
         basis: ceiling?.basis ?? null,
       };
 
+  const projectedWos = payloadNumber(payload, "projected_wos");
+
   return {
     id: row.id,
     action: row.action ?? "STOCKOUT_RISK",
@@ -283,10 +317,15 @@ function toExceptionView(
     channel: labels.channel[row.channel_id ?? ""] ?? row.channel_id ?? "",
     region: labels.region[row.region_id ?? ""] ?? row.region_id ?? "",
     valueAtStakeInr: row.value_at_stake_inr,
-    projectedWos: payloadNumber(payload, "projected_wos"),
+    projectedWos,
     unitsAtRisk: payloadNumber(payload, "units_at_risk"),
     threshold:
       threshold.weeks === null && threshold.basis === null ? null : threshold,
+    // Measured here, off the local threshold rather than the one the view
+    // publishes, because those differ only in that the view drops a threshold
+    // carrying neither a number nor a basis -- and a threshold with no number
+    // yields no distance either way.
+    breachWeeks: breachWeeks({ isStockout, projectedWos, threshold }),
     rationale: row.rationale,
     modelVersion: row.model_version,
     generatedAt: row.generated_at,
@@ -296,6 +335,9 @@ function toExceptionView(
     accountablePlanner: row.accountable_planner,
     acceptedValue: row.accepted_value,
     overrideReason: row.override_reason,
+    grossMargin: economics?.grossMargin ?? null,
+    clearanceCostPerUnitInr: economics?.clearanceCostPerUnitInr ?? null,
+    holdingCostPerUnitWeekInr: economics?.holdingCostPerUnitWeekInr ?? null,
   };
 }
 
@@ -305,6 +347,29 @@ function toExceptionView(
 function one(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
+}
+
+/**
+ * ?rec=<recommendation id> -- a planner arriving from a specific decision on
+ * the dashboard rather than from the top of the queue.
+ *
+ * IT NAMES A ROW; IT DOES NOT SELECT ONE. The id is handed to the queue as
+ * the row to open, never as a filter, so a link that points at nothing -- a
+ * missing parameter, a word where a number should be, a recommendation
+ * outside this session's RLS scope, or one the ?status=open lens has already
+ * put out of view -- lands on the ordinary queue with nothing expanded. There
+ * is deliberately no "that row was not found" state: the reader asked for the
+ * exceptions and the exceptions are what is on screen, and a stale link is
+ * not worth telling them their queue is broken.
+ *
+ * Parsed strictly rather than with parseInt, which would read "12-and-a-half"
+ * as row twelve and open a row nobody asked for.
+ */
+function recommendationId(value: string | string[] | undefined): number | null {
+  const raw = one(value);
+  if (raw === null || raw.trim() === "") return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : null;
 }
 
 export default async function ExceptionsPage({
@@ -321,24 +386,48 @@ export default async function ExceptionsPage({
   const sb = await createServerAnonClient();
   const params = await searchParams;
 
-  const [rows, policies, touchless, accuracies, labels] = await Promise.all([
-    brandId
-      ? getExceptions(sb, brandId)
-      : Promise.resolve<RecommendationState[]>([]),
-    brandId
-      ? getPolicyParameters(sb, brandId)
-      : Promise.resolve<PolicyParameter[]>([]),
-    getTouchlessRate(sb),
-    getAccuracyHeadline(sb, brand),
-    readLabels(sb).catch(() => EMPTY_LABELS),
-  ]);
+  const [rows, policies, touchless, accuracies, labels, economics] =
+    await Promise.all([
+      brandId
+        ? getExceptions(sb, brandId)
+        : Promise.resolve<RecommendationState[]>([]),
+      brandId
+        ? getPolicyParameters(sb, brandId)
+        : Promise.resolve<PolicyParameter[]>([]),
+      getTouchlessRate(sb),
+      getAccuracyHeadline(sb, brand),
+      readLabels(sb).catch(() => EMPTY_LABELS),
+      // CHAINED INSIDE THE WAVE, NOT AWAITED AFTER IT. readPlanEconomics needs
+      // the horizon, so the two are dependent -- but the pair is independent of
+      // everything else in this wave, and awaiting it on its own line put a
+      // full extra round trip in front of the first byte of a screen that had
+      // none. Chained here it costs the same two hops it always did, off the
+      // critical path of the reads beside it.
+      brandId
+        ? readHorizonWeeks(sb, brandId)
+            .catch(() => 0)
+            .then((weeks) => readPlanEconomics(sb, brandId, weeks))
+            .then((result) => result?.economics ?? null)
+            .catch(() => null)
+        : Promise.resolve<PlanEconomics | null>(null),
+    ]);
+
+  // THE RATES COME FROM THE SCENARIO READER, NOT FROM A SECOND DERIVATION.
+  // An exception row states one INR figure and never says what it is. Saying
+  // so means pricing units -- and the clearance cost, the holding cost and
+  // the gross margin already have exactly one reader in this codebase, which
+  // reads them out of the same policy_parameter table resolvePolicies() above
+  // reads its ceilings from, for the same brand. A second derivation here
+  // would be a second clearance rate, and two of those is how a screen starts
+  // disagreeing with itself. A failed read is null rates and dashes on the
+  // rows; it never takes the queue down with it.
 
   const headline: AccuracyHeadline | null =
     accuracies.find((a) => a.brandId === brandId) ?? accuracies[0] ?? null;
 
   const policy = resolvePolicies(policies, labels.category);
   const views: ExceptionView[] = rows.map((row) =>
-    toExceptionView(row, labels, policy),
+    toExceptionView(row, labels, policy, economics),
   );
 
   // Counted from the rows this planner can actually see. A number here that
@@ -540,7 +629,11 @@ export default async function ExceptionsPage({
         </p>
       ) : null}
 
-      <ExceptionQueue rows={queue} scopeLabel={scopeLabel} />
+      <ExceptionQueue
+        rows={queue}
+        scopeLabel={scopeLabel}
+        initialOpenId={recommendationId(params.rec)}
+      />
 
       <div className="mt-[16px]">
         <TouchlessBanner touchless={touchless} />

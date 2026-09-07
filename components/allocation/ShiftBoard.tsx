@@ -6,6 +6,13 @@ import { useId, useState } from "react";
 // barrel, as the exception queue's row does: this is a client component, and
 // the barrel would pull every other screen's components into its bundle.
 import { formatUnits } from "../DriverBars";
+// The rupee formatter is IMPORTED, not copied. It carries the app's crore /
+// lakh cut and its arithmetic Indian grouping (the same string on the server
+// and after hydration), and a second one living here would be free to drift
+// from the one the exception queue and the buy plan already spell money with.
+// components/exceptions/format only reaches for ../DriverBars, so nothing in
+// this direction is circular.
+import { formatInr } from "../exceptions/format";
 import { Pill, type PillVariant } from "../Pill";
 import { RoleGate } from "../RoleGate";
 
@@ -291,6 +298,31 @@ function ShiftRow({
                 {moved > 0 ? "+" : ""}
                 {formatUnits(moved)} units
               </span>
+              {/*
+                THE MONEY SITS HERE AND NOWHERE ELSE ON THIS SCREEN -- not in
+                the collapsed row, not on a KPI card. It is a derived figure
+                standing beside the units it was derived from, and a reader
+                who has opened the row is a reader who will also read the
+                sentence under it saying what it is and is not. Lifted onto a
+                card it would become the headline of the page, which is a
+                claim about allocation that neither the model nor the stored
+                data makes.
+
+                formatInr already returns the app's dash for a null, so an
+                unpriced series degrades here without a branch.
+              */}
+              <span className="text-[11.5px] font-extrabold tabular-nums text-ink">
+                {/* Named for a screen reader only. A sighted reader takes the
+                    meaning from the sentence directly beneath, which has the
+                    room to say what the figure is NOT; a listener reaching
+                    this span hears a bare rupee amount unless it is named
+                    here, and an unnamed money figure is the one thing this
+                    row cannot afford. */}
+                <span className="sr-only">
+                  Revenue moving with those units, derived:{" "}
+                </span>
+                {formatInr(shift.valueAtStakeInr)}
+              </span>
               {shift.status === null ? null : (
                 <span className="text-[11.5px] font-semibold text-mute">
                   {statusLabel(shift.status)}
@@ -301,6 +333,24 @@ function ShiftRow({
                 </span>
               )}
             </div>
+
+            {/*
+              THE LABEL MATTERS MORE THAN THE FIGURE. Three things have to be
+              true of it and all three are said in one line: the number is
+              derived on this screen rather than read from
+              recommendation.value_at_stake_inr, which is null on every
+              allocation row and stays null; it is the revenue that travels
+              with the units, not margin; and it is not incremental, because
+              a reallocation moves demand between regions instead of creating
+              any. Without that last clause a planner would read this as the
+              upside of approving, and it is not -- it is the size of what is
+              being moved.
+            */}
+            <p className="mt-[6px] max-w-[76ch] text-[11.5px] font-semibold leading-[1.6] text-mute">
+              {shift.valueAtStakeInr === null
+                ? "No selling price is published for this series, so the units above carry no rupee figure here rather than one borrowed from the brand average."
+                : "Derived on this screen from this series' demand-weighted selling price: the revenue that travels with those units, not margin and not new demand, since the move takes them from another region rather than creating them."}
+            </p>
 
             {shift.rationale ? (
               <p className="mt-[8px] max-w-[76ch] text-[11.5px] font-semibold leading-[1.6] text-mute">
