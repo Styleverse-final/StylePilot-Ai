@@ -12,6 +12,8 @@ import {
   buildJourney,
   buildOverrideAnalysis,
   type DecisionRead,
+  getUsageEvidence,
+  type UsageEvidence,
   buildRollup,
   getAdoptionFor,
   getAdoption,
@@ -238,6 +240,7 @@ export default async function LearningPage() {
   // not be read, so each block degrades on its own and says which one failed.
 
   let journey: Journey | null = null;
+  let evidence: UsageEvidence | null = null;
   let catalogue: LearningModule[] = [];
   let journeyError: string | null = null;
 
@@ -256,10 +259,17 @@ export default async function LearningPage() {
       // inheritance rules -- "Needs most support" inherits the Willing
       // curriculum and adds two, a C3 leader gets C2 plus governance -- live
       // in that function and are not restated here.
-      const curriculum = adoption?.segment
-        ? await getCurriculum(sb, adoption.segment, person.learningTier, person.appRole)
-        : [];
+      const [curriculum, usage] = await Promise.all([
+        adoption?.segment
+          ? getCurriculum(sb, adoption.segment, person.learningTier, person.appRole)
+          : Promise.resolve([]),
+        // The demo ground's input: the reader's own ledger and copilot rows.
+        // A failed read renders zero checks passed rather than taking the
+        // journey down -- absence of evidence, stated as such.
+        getUsageEvidence(sb, employeeId).catch(() => null),
+      ]);
       journey = buildJourney(person, adoption, curriculum, completions);
+      evidence = usage;
     }
   } catch (error) {
     journeyError = error instanceof Error ? error.message : String(error);
@@ -359,6 +369,16 @@ export default async function LearningPage() {
             journey={journey}
             appRole={appRole}
             coachingBacklog={canAssignCoaches && support ? support.total : null}
+            evidence={
+              evidence ?? {
+                committed: 0,
+                disagreedWithReason: 0,
+                scenariosSaved: 0,
+                copilotAsked: 0,
+                latestDecisionAt: null,
+              }
+            }
+            canDecide={appRole !== "cmpo" && appRole !== "group_cmpo"}
           />
         </>
       ) : (

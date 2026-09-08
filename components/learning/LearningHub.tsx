@@ -6,15 +6,15 @@ import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components";
 import { iconFor } from "@/components/navIcons";
 
-import type { Journey, JourneyStep, StepState } from "./data";
+import type { Journey, JourneyStep, StepState, UsageEvidence } from "./data";
 import { DASH, formatDate, formatHoursBare, formatScore } from "./format";
-import { WRITTEN_MODULES, readMinutes } from "./hubContent";
-import { WrittenLibrary, type LibraryItem } from "./WrittenLibrary";
+import { WRITTEN_MODULES } from "./hubContent";
+import { ProveIt } from "./ProveIt";
 
 /**
  * The learning hub, laid out to the reference design: hero banner with the
- * progress card beside it, the module cards, the written-module library with
- * the self-check, then activities, the certificate and the recommended row.
+ * progress card beside it, the module cards, the demo ground that checks
+ * real usage, then activities, the certificate and the recommended row.
  *
  * WHAT THE REFERENCE ASKED FOR THAT IS DELIBERATELY NOT HERE. Watched-video
  * counts, quiz-minute estimates, scheduled activities dated "Today" and
@@ -68,10 +68,10 @@ function Hero({ next }: { next: JourneyStep | null }) {
         </p>
         {next ? (
           <Link
-            href="#library"
+            href="#prove-it"
             className="mt-[14px] inline-flex items-center gap-[9px] rounded-pill bg-orange px-[18px] py-[9px] text-[12.5px] font-extrabold text-white transition-colors duration-[120ms] hover:bg-orangeD"
           >
-            Continue learning
+            Show you can drive it
             <span aria-hidden="true">&rarr;</span>
           </Link>
         ) : (
@@ -245,9 +245,17 @@ function QuoteCard() {
 
 // ------------------------------------------------------------ modules
 
+/** The screen a module is practised on, where one is mapped. */
+const PRACTICE_ROUTE = new Map(
+  WRITTEN_MODULES.map((w) => [w.moduleId, w.route] as const),
+);
+
 function ModuleCard({ step, index }: { step: JourneyStep; index: number }) {
   const m = step.module;
   const bar = BAR[step.state];
+  // The arrow goes to the live screen this module is practised on, because
+  // the proof of the module is a row made there -- not more reading.
+  const practiceRoute = PRACTICE_ROUTE.get(m.moduleId) ?? null;
 
   return (
     <div className="flex min-w-0 flex-col rounded-card border border-rule bg-white p-[14px]">
@@ -281,13 +289,15 @@ function ModuleCard({ step, index }: { step: JourneyStep; index: number }) {
             ? formatScore(step.score)
             : progressLabel(step.state)}
         </span>
-        <Link
-          href="#library"
-          aria-label={`Open learning material for ${m.title}`}
-          className="flex h-[24px] w-[24px] flex-none items-center justify-center rounded-full border border-orange text-[12px] font-extrabold text-orangeD transition-colors duration-[120ms] hover:bg-peach"
-        >
-          <span aria-hidden="true">&rarr;</span>
-        </Link>
+        {practiceRoute ? (
+          <Link
+            href={practiceRoute}
+            aria-label={`Practice ${m.title} on ${practiceRoute}`}
+            className="flex h-[24px] w-[24px] flex-none items-center justify-center rounded-full border border-orange text-[12px] font-extrabold text-orangeD transition-colors duration-[120ms] hover:bg-peach"
+          >
+            <span aria-hidden="true">&rarr;</span>
+          </Link>
+        ) : null}
       </div>
     </div>
   );
@@ -305,9 +315,12 @@ type Activity = {
 function ActivitiesCard({
   journey,
   coachingBacklog,
+  checksRemaining,
 }: {
   journey: Journey;
   coachingBacklog: number | null;
+  /** Demo checks not yet evidenced; null hides the row. */
+  checksRemaining: number | null;
 }) {
   const rows: Activity[] = [];
 
@@ -324,12 +337,12 @@ function ActivitiesCard({
       right: next.status === "in_progress" ? "Resume" : "Up next",
     });
   }
-  if (journey.completedCount > 0) {
+  if (checksRemaining !== null && checksRemaining > 0) {
     rows.push({
-      key: "quiz",
-      title: "Quick knowledge check",
-      sub: "Ten questions on what you have finished",
-      right: "Anytime",
+      key: "prove",
+      title: "Demonstrate it on the live screens",
+      sub: `${checksRemaining} of the demo checks still to show`,
+      right: "Prove it",
     });
   }
   if (coachingBacklog !== null && coachingBacklog > 0) {
@@ -495,34 +508,19 @@ export function LearningHub({
   journey,
   appRole,
   coachingBacklog,
+  evidence,
+  canDecide,
 }: {
   journey: Journey;
   appRole: string | null;
   /** Support-list size, passed only for the roles that assign coaches. */
   coachingBacklog: number | null;
+  /** The reader's own ledger and copilot rows -- the demo ground's input. */
+  evidence: UsageEvidence;
+  /** False for portfolio roles, whose commits the database refuses. */
+  canDecide: boolean;
 }) {
   const { steps } = journey;
-
-  // The library is the intersection of this person's path and the modules
-  // that have written material. A module without text gets no card: a card
-  // that opens nothing is the dead click the whole row exists to avoid.
-  const statusById = new Map(
-    steps.map((s) => [s.module.moduleId, s.status] as const),
-  );
-  const titleById = new Map(
-    steps.map((s) => [s.module.moduleId, s.module.title] as const),
-  );
-  const library: LibraryItem[] = WRITTEN_MODULES.filter((w) =>
-    statusById.has(w.moduleId),
-  ).map((w) => ({
-    moduleId: w.moduleId,
-    title: titleById.get(w.moduleId) ?? w.moduleId,
-    route: w.route,
-    art: w.art,
-    minutes: readMinutes(w),
-    status: statusById.get(w.moduleId) ?? "not_started",
-    sections: w.sections,
-  }));
 
   return (
     <div className="grid grid-cols-[1fr_330px] items-start gap-[16px] max-[1140px]:grid-cols-1">
@@ -550,27 +548,30 @@ export function LearningHub({
           </CardBody>
         </Card>
 
-        <Card id="library">
-          <CardHeader
-            title="Continue learning"
-            subtitle="Written modules with computed read times -- there are no videos, and nothing here pretends otherwise"
-          />
-          <CardBody>
-            {library.length === 0 ? (
-              <p className="text-[12.5px] font-semibold leading-[1.6] text-mute">
-                No written material exists yet for the modules on your path.
-                The self-check below still runs.
-              </p>
-            ) : null}
-            <WrittenLibrary items={library} />
-          </CardBody>
-        </Card>
+        {/* The written-module library stood here and was removed on review:
+            reading about the workbench proved you could read. The demo ground
+            answers the question the library could not -- whether this person
+            can USE the system -- from their own ledger rows. */}
+        <ProveIt evidence={evidence} canDecide={canDecide} />
       </div>
 
       <div className="flex min-w-0 flex-col gap-[16px]">
         <ProgressCard journey={journey} />
         <QuoteCard />
-        <ActivitiesCard journey={journey} coachingBacklog={coachingBacklog} />
+        <ActivitiesCard
+          journey={journey}
+          coachingBacklog={coachingBacklog}
+          checksRemaining={
+            canDecide
+              ? [
+                  evidence.committed > 0,
+                  evidence.disagreedWithReason > 0,
+                  evidence.scenariosSaved > 0,
+                  evidence.copilotAsked > 0,
+                ].filter((done) => !done).length
+              : null
+          }
+        />
         <CertificateCard journey={journey} />
       </div>
 

@@ -326,6 +326,82 @@ export async function getAdoptionFor(
   return data ? toAdoption(data) : null;
 }
 
+/**
+ * The reader's own usage evidence -- the raw material of the demo panel.
+ *
+ * "Can this person use the system" is not a quiz question here; it is four
+ * facts the ledger already holds. Committing a decision, disagreeing with a
+ * reason, saving a scenario and asking the copilot each leave a row, and
+ * those rows are the proof. Reading them back is the whole check: nothing is
+ * tracked that was not already tracked, and nothing can be ticked without
+ * having actually been done on a live screen.
+ *
+ * Everything is scoped to the caller's own rows: planner_decision through the
+ * recommendation-visibility policy, copilot_log through its own-read policy.
+ */
+export type UsageEvidence = {
+  /** Committed human decisions: APPROVED, MODIFIED or REJECTED. */
+  committed: number;
+  /** MODIFIED or REJECTED rows carrying a written reason. */
+  disagreedWithReason: number;
+  /** Saved scenarios (status SCENARIO in the same ledger). */
+  scenariosSaved: number;
+  /** Questions asked of the copilot. */
+  copilotAsked: number;
+  latestDecisionAt: string | null;
+};
+
+export async function getUsageEvidence(
+  sb: StyleverseClient,
+  employeeId: string,
+): Promise<UsageEvidence> {
+  const [decisions, copilot] = await Promise.all([
+    sb
+      .from("planner_decision")
+      .select("status, override_reason, decided_at")
+      .eq("planner_id", employeeId)
+      .eq("actor_type", "human")
+      .order("decided_at", { ascending: false })
+      .limit(500),
+    sb
+      .from("copilot_log")
+      .select("id", { count: "exact", head: true })
+      .eq("planner_id", employeeId),
+  ]);
+  if (decisions.error) fail("getUsageEvidence(decisions)", decisions.error);
+  if (copilot.error) fail("getUsageEvidence(copilot)", copilot.error);
+
+  let committed = 0;
+  let disagreedWithReason = 0;
+  let scenariosSaved = 0;
+  let latestDecisionAt: string | null = null;
+  for (const row of decisions.data ?? []) {
+    if (row.status === "SCENARIO") {
+      scenariosSaved += 1;
+      continue;
+    }
+    committed += 1;
+    if (latestDecisionAt === null && row.decided_at !== null) {
+      latestDecisionAt = row.decided_at;
+    }
+    if (
+      (row.status === "MODIFIED" || row.status === "REJECTED") &&
+      row.override_reason !== null &&
+      row.override_reason.trim().length > 0
+    ) {
+      disagreedWithReason += 1;
+    }
+  }
+
+  return {
+    committed,
+    disagreedWithReason,
+    scenariosSaved,
+    copilotAsked: copilot.count ?? 0,
+    latestDecisionAt,
+  };
+}
+
 /** Every completion row the caller may read. Paged. */
 export async function getAllCompletions(
   sb: StyleverseClient,
