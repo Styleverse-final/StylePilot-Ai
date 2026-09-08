@@ -11,6 +11,7 @@ import {
 import {
   buildJourney,
   buildOverrideAnalysis,
+  type DecisionRead,
   buildRollup,
   getAdoptionFor,
   getAdoption,
@@ -33,6 +34,11 @@ import {
   formatTimestamp,
   plural,
 } from "@/components/learning/format";
+import {
+  BrandComparison,
+  MIN_DECISIONS_TO_CORRELATE,
+  OverrideInputs,
+} from "@/components/learning/BrandPanels";
 import { LearningHub } from "@/components/learning/LearningHub";
 import {
   OverrideScatter,
@@ -51,7 +57,6 @@ import {
 import { getAccuracyHeadline, type AccuracyHeadline } from "@/lib/accuracy";
 import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
-import { redirectCmpoToPortfolio } from "@/lib/guards";
 
 export const metadata: Metadata = {
   title: "Learning",
@@ -107,6 +112,10 @@ export const metadata: Metadata = {
  * empty section rather than a leak.
  */
 const MANAGER_ROLES: readonly string[] = [
+  // Sees the roll-up scoped to their own categories: the completion-read
+  // policy hands a category manager only the people whose categories overlap
+  // theirs, so the same code renders a narrower cohort.
+  "category_manager",
   "planning_manager",
   "cmpo",
   "group_cmpo",
@@ -190,7 +199,10 @@ function accuracyForDecisions(
 }
 
 export default async function LearningPage() {
-  await redirectCmpoToPortfolio();
+  // No CMPO redirect here any more: a CMPO's own C3 path and the aggregate
+  // roll-up are exactly the learning view that role is supposed to have. What
+  // stays closed to them is the named coaching bench below, which is gated on
+  // the roles whose job is assigning support.
   const planner = await getSessionPlanner();
   const employeeId = planner?.employeeId ?? null;
   const appRole = planner?.appRole ?? null;
@@ -245,7 +257,7 @@ export default async function LearningPage() {
       // curriculum and adds two, a C3 leader gets C2 plus governance -- live
       // in that function and are not restated here.
       const curriculum = adoption?.segment
-        ? await getCurriculum(sb, adoption.segment, person.learningTier)
+        ? await getCurriculum(sb, adoption.segment, person.learningTier, person.appRole)
         : [];
       journey = buildJourney(person, adoption, curriculum, completions);
     }
@@ -255,6 +267,7 @@ export default async function LearningPage() {
 
   let rollup: Rollup | null = null;
   let analysis: OverrideAnalysis | null = null;
+  let decisionRead: DecisionRead | null = null;
   let regionLabels: Record<string, string> = {};
   let rollupError: string | null = null;
   let headlines: AccuracyHeadline[] = [];
@@ -275,6 +288,7 @@ export default async function LearningPage() {
         ]);
       regionLabels = labels;
       rollup = buildRollup(people, adoptions, allCompletions, modules, labels);
+      decisionRead = decisions;
       analysis = buildOverrideAnalysis(rollup.people, decisions);
     } catch (error) {
       rollupError = error instanceof Error ? error.message : String(error);
@@ -290,6 +304,29 @@ export default async function LearningPage() {
   }
 
   const support = rollup ? selectSupport(rollup) : null;
+
+  // THE NAMES RULE. Aggregates by default; names only where the purpose is
+  // assigning support. A CMPO reads "38 people in Wave 3 are behind"; the
+  // planning manager pairing coaches reads who they are. The named panels
+  // below are gated on this, and the page states the rule where it gates.
+  const canAssignCoaches =
+    appRole === "planning_manager" || appRole === "commercial_lead";
+  const isGroup = appRole === "group_cmpo";
+
+  // Per-brand override analysis for the group view. Brands are never pooled
+  // into one correlation: EcoWeave's decisions are not made by SpeedStyle's
+  // planners, and the 1C gate is applied to each brand on its own.
+  const analysisForBrand = (brand: string): OverrideAnalysis | null => {
+    if (!rollup || !decisionRead) return null;
+    const cohort = rollup.people.filter((row) => row.person.brandId === brand);
+    const ids = new Set(cohort.map((row) => row.person.employeeId));
+    return buildOverrideAnalysis(cohort, {
+      ...decisionRead,
+      decisions: decisionRead.decisions.filter((d) => ids.has(d.plannerId)),
+    });
+  };
+  const peopleForBrand = (brand: string) =>
+    rollup ? rollup.people.filter((row) => row.person.brandId === brand) : [];
   const accuracy = accuracyForDecisions(headlines, analysis, planner?.brandId ?? null);
   const segmentHours = rollup ? segmentHoursRange(rollup) : null;
 
@@ -318,7 +355,11 @@ export default async function LearningPage() {
             journey object, so rendering the hub beside them would have put
             each module on the screen twice.
           */}
-          <LearningHub journey={journey} />
+          <LearningHub
+            journey={journey}
+            appRole={appRole}
+            coachingBacklog={canAssignCoaches && support ? support.total : null}
+          />
         </>
       ) : (
         <Explain>
@@ -367,6 +408,10 @@ export default async function LearningPage() {
               : "a segment asked for more hours is not made to look worse than one asked for fewer."}
           </SectionHeading>
 
+          {isGroup ? (
+            <BrandComparison people={rollup.people} read={decisionRead} />
+          ) : null}
+
           <div className="mb-[16px]">
             <SegmentBreakdown rollup={rollup} />
           </div>
@@ -408,14 +453,22 @@ export default async function LearningPage() {
             </CardBody>
           </Card>
 
-          <div className="mb-[16px] grid grid-cols-[1fr_1fr] items-start gap-[16px] max-[1140px]:grid-cols-1">
-            <HoursDelivered rollup={rollup} />
-            <CoachBench rollup={rollup} regionLabels={regionLabels} />
-          </div>
+          {canAssignCoaches ? (
+            <>
+              <div className="mb-[16px] grid grid-cols-[1fr_1fr] items-start gap-[16px] max-[1140px]:grid-cols-1">
+                <HoursDelivered rollup={rollup} />
+                <CoachBench rollup={rollup} regionLabels={regionLabels} />
+              </div>
 
-          <div className="mb-[16px]">
-            <SupportList selection={support} regionLabels={regionLabels} />
-          </div>
+              <div className="mb-[16px]">
+                <SupportList selection={support} regionLabels={regionLabels} />
+              </div>
+            </>
+          ) : (
+            <div className="mb-[16px]">
+              <HoursDelivered rollup={rollup} />
+            </div>
+          )}
 
           <SectionHeading
             eyebrow="The question worth asking of this data"
@@ -430,7 +483,40 @@ export default async function LearningPage() {
             screen at the same size.
           </SectionHeading>
 
-          {analysis ? <OverrideScatter analysis={analysis} /> : null}
+          {isGroup ? (
+            <div className="flex flex-col gap-[16px]">
+              {(["SPD", "ECO"] as const).map((brand) => {
+                const brandAnalysis = analysisForBrand(brand);
+                if (!brandAnalysis) return null;
+                return brandAnalysis.decisionCount >= MIN_DECISIONS_TO_CORRELATE ? (
+                  <OverrideScatter key={brand} analysis={brandAnalysis} />
+                ) : (
+                  <OverrideInputs
+                    key={brand}
+                    brandLabel={brand === "SPD" ? "SpeedStyle" : "EcoWeave"}
+                    people={peopleForBrand(brand)}
+                    decisionCount={brandAnalysis.decisionCount}
+                    overrideCount={brandAnalysis.overrideCount}
+                  />
+                );
+              })}
+            </div>
+          ) : analysis && analysis.decisionCount >= MIN_DECISIONS_TO_CORRELATE ? (
+            <OverrideScatter analysis={analysis} />
+          ) : analysis ? (
+            <OverrideInputs
+              brandLabel={
+                planner?.brandId === "ECO"
+                  ? "EcoWeave"
+                  : planner?.brandId === "SPD"
+                    ? "SpeedStyle"
+                    : "This brand"
+              }
+              people={rollup.people}
+              decisionCount={analysis.decisionCount}
+              overrideCount={analysis.overrideCount}
+            />
+          ) : null}
 
           {analysis ? (
             <ModelStrip

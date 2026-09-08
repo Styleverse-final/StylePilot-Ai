@@ -73,11 +73,23 @@ export function selectSupport(rollup: Rollup): SupportSelection {
     medians.set(segment, median(shares) ?? 0);
   }
 
-  const coachesByRegion = new Map<string, number>();
-  for (const coach of rollup.coaches) {
-    const region = coach.person.regionId ?? "Unassigned";
-    coachesByRegion.set(region, (coachesByRegion.get(region) ?? 0) + 1);
-  }
+  // A coach counts for a person only if the coach has themselves COMPLETED
+  // the module that person needs next. Region alone used to be the test, and
+  // it overcounted: a Champion two modules behind the person they were
+  // supposed to help is not a coach for that module, however close they sit.
+  // An uncompleted coach is worse than no coach -- the pairing exists to put
+  // someone who has been through it next to someone who has not.
+  const coachesFor = (regionId: string | null, moduleId: string | null): number => {
+    if (moduleId === null) return 0;
+    const region = regionId ?? "Unassigned";
+    let count = 0;
+    for (const coach of rollup.coaches) {
+      if ((coach.person.regionId ?? "Unassigned") !== region) continue;
+      const done = rollup.completedByCoach[coach.person.employeeId];
+      if (done && done.includes(moduleId)) count += 1;
+    }
+    return count;
+  };
 
   const belowBySegment = new Map<string, number>();
   const rows: SupportRow[] = [];
@@ -89,7 +101,7 @@ export function selectSupport(rollup: Rollup): SupportSelection {
       ...row,
       segmentMedianShare,
       hoursRemaining: Math.max(0, row.pathHours - row.completedHours),
-      coachesInRegion: coachesByRegion.get(row.person.regionId ?? "Unassigned") ?? 0,
+      coachesInRegion: coachesFor(row.person.regionId, row.nextModuleId),
     });
   }
 
@@ -180,7 +192,11 @@ function supportColumns(
     },
     {
       key: "coaches",
-      header: "Coaches in region",
+      // Not "coaches in region": the count is coaches in the region who have
+      // THEMSELVES completed the module this person needs next. The header
+      // says what the number now means, or the tightened rule reads as fewer
+      // coaches for no reason.
+      header: "Coaches ready for their next module",
       numeric: true,
       cell: (row) =>
         row.coachesInRegion > 0 ? (

@@ -130,12 +130,16 @@ const NAV_BY_ROLE: Readonly<Record<string, NavConfig>> = {
   cmpo: {
     primary: [PORTFOLIO],
     secondary: [],
-    more: [MODEL_OPS, GOVERNANCE, SIGNALS, DOWNSTREAM],
+    // Learning is here because a CMPO now has a real learning view: their own
+    // C3 path and the brand roll-up in aggregate. The named coaching bench
+    // stays with the roles that assign coaches; absence from THIS list was
+    // never the access control and still is not.
+    more: [MODEL_OPS, GOVERNANCE, SIGNALS, DOWNSTREAM, LEARNING],
   },
   group_cmpo: {
     primary: [PORTFOLIO],
     secondary: [],
-    more: [MODEL_OPS, GOVERNANCE, SIGNALS, DOWNSTREAM],
+    more: [MODEL_OPS, GOVERNANCE, SIGNALS, DOWNSTREAM, LEARNING],
   },
 
   /** The one role that needs the whole surface. Nothing absent. */
@@ -228,7 +232,6 @@ export const CMPO_BLOCKED_ROUTES: readonly string[] = [
   "/allocation",
   "/markdown",
   "/scenarios",
-  "/learning",
   "/adoption",
 ];
 

@@ -257,19 +257,24 @@ export async function getLearningCatalogue(
 /**
  * The modules one person actually sees, in order.
  *
- * This is modules_for(segment, tier) and nothing else. The two inheritance
- * rules are encoded in that function; calling it is how they stay in one
- * place. A C3 leader in "Needs most support" gets ten modules out of this,
- * and no TypeScript here knows why.
+ * This is modules_for(segment, tier, role) and nothing else. The inheritance
+ * rules and the role supplements are encoded in that function; calling it is
+ * how they stay in one place. A C3 leader in "Needs most support" gets ten
+ * modules out of this, a category manager gets their escalation module, and
+ * no TypeScript here knows why.
  */
 export async function getCurriculum(
   sb: StyleverseClient,
   segment: string,
   tier: string,
+  role: string | null,
 ): Promise<LearningModule[]> {
   const { data, error } = await sb.rpc("modules_for", {
     p_segment: segment,
     p_tier: tier,
+    // The role supplement. modules_for names the rule per role; the only
+    // fact this caller adds is who is asking.
+    p_role: role,
   });
   if (error) fail("getCurriculum(modules_for)", error);
   return (data ?? [])
@@ -608,6 +613,12 @@ export type PersonProgress = {
   share: number;
   /** True once every module on their path is finished. */
   finished: boolean;
+  /**
+   * The lowest-sequence module on their path not yet completed. Null once the
+   * path is finished. Exists so the coach bench can be matched to the module
+   * a person actually needs next rather than to the region alone.
+   */
+  nextModuleId: string | null;
 };
 
 export type GroupStat = {
@@ -642,6 +653,13 @@ export type Rollup = {
   /** Champions who have finished the module that teaches coaching. */
   coaches: PersonProgress[];
   coachModule: LearningModule | null;
+  /**
+   * Module ids each coach has themselves completed, keyed by employee id.
+   * A Champion is only offered as a coach for a module in this set: someone
+   * who has not finished the module is not available to coach it, however
+   * available their calendar is. An uncompleted coach is worse than no coach.
+   */
+  completedByCoach: Record<string, readonly string[]>;
 };
 
 /** The segment whose curriculum carries the coaching module. */
@@ -736,6 +754,10 @@ export function buildRollup(
     inProgress: number;
     pathHours: number;
     completedHours: number;
+    /** Module ids on the path not yet completed, unordered. */
+    incomplete: string[];
+    /** Module ids completed, for the coach bench. */
+    done: string[];
   };
   const buckets = new Map<string, Bucket>();
   for (const row of completions) {
@@ -747,6 +769,8 @@ export function buildRollup(
         inProgress: 0,
         pathHours: 0,
         completedHours: 0,
+        incomplete: [],
+        done: [],
       };
       buckets.set(row.employeeId, bucket);
     }
@@ -756,10 +780,31 @@ export function buildRollup(
     if (row.status === "completed") {
       bucket.completed += 1;
       bucket.completedHours += hours;
+      bucket.done.push(row.moduleId);
     } else if (row.status === "in_progress") {
       bucket.inProgress += 1;
+      bucket.incomplete.push(row.moduleId);
+    } else {
+      bucket.incomplete.push(row.moduleId);
     }
   }
+
+  // Catalogue order decides which incomplete module is "next" -- the same
+  // sequence rule the journey uses, applied from the rows a manager may read.
+  const sequenceOf = new Map<string, number>();
+  for (const lesson of catalogue) sequenceOf.set(lesson.moduleId, lesson.sequence);
+  const nextOf = (ids: readonly string[]): string | null => {
+    let best: string | null = null;
+    let bestSeq = Number.POSITIVE_INFINITY;
+    for (const id of ids) {
+      const seq = sequenceOf.get(id) ?? Number.POSITIVE_INFINITY;
+      if (seq < bestSeq || (seq === bestSeq && (best === null || id < best))) {
+        best = id;
+        bestSeq = seq;
+      }
+    }
+    return best;
+  };
 
   const progress: PersonProgress[] = [];
   for (const person of people) {
@@ -780,6 +825,7 @@ export function buildRollup(
       recommendedHours: record?.recommendedHours ?? null,
       share: bucket.modules > 0 ? bucket.completed / bucket.modules : 0,
       finished: bucket.completed === bucket.modules,
+      nextModuleId: nextOf(bucket.incomplete),
     });
   }
 
@@ -804,6 +850,11 @@ export function buildRollup(
         coachIds.add(row.employeeId);
       }
     }
+  }
+
+  const completedByCoach: Record<string, readonly string[]> = {};
+  for (const [employeeId, bucket] of buckets) {
+    if (coachIds.has(employeeId)) completedByCoach[employeeId] = bucket.done;
   }
 
   const coaches = progress
@@ -843,6 +894,7 @@ export function buildRollup(
     priorHoursPeople: priorPeople,
     coaches,
     coachModule,
+    completedByCoach,
   };
 }
 
