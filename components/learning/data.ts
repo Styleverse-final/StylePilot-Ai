@@ -274,7 +274,7 @@ export async function getCurriculum(
     p_tier: tier,
     // The role supplement. modules_for names the rule per role; the only
     // fact this caller adds is who is asking.
-    p_role: role,
+    p_role: role ?? undefined,
   });
   if (error) fail("getCurriculum(modules_for)", error);
   return (data ?? [])

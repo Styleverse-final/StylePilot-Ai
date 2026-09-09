@@ -916,6 +916,7 @@ export type Database = {
           module_id: string
           segment: string
           sequence: number
+          target_role: string | null
           tier: string
           title: string
           unlocks_capability: string
@@ -927,6 +928,7 @@ export type Database = {
           module_id: string
           segment: string
           sequence: number
+          target_role?: string | null
           tier: string
           title: string
           unlocks_capability: string
@@ -938,6 +940,7 @@ export type Database = {
           module_id?: string
           segment?: string
           sequence?: number
+          target_role?: string | null
           tier?: string
           title?: string
           unlocks_capability?: string
@@ -1371,6 +1374,150 @@ export type Database = {
           },
         ]
       }
+      trend_attr_score: {
+        Row: {
+          attribute: string
+          brand_id: string
+          category_id: string
+          confidence: string
+          derivation: string | null
+          direction: string
+          generated_at: string
+          id: number
+          lead_weeks: number | null
+          share_asof: string | null
+          source: string
+          support_weeks: number | null
+          trend_score: number
+          value: string
+        }
+        Insert: {
+          attribute: string
+          brand_id: string
+          category_id: string
+          confidence: string
+          derivation?: string | null
+          direction: string
+          generated_at?: string
+          id?: never
+          lead_weeks?: number | null
+          share_asof?: string | null
+          source: string
+          support_weeks?: number | null
+          trend_score: number
+          value: string
+        }
+        Update: {
+          attribute?: string
+          brand_id?: string
+          category_id?: string
+          confidence?: string
+          derivation?: string | null
+          direction?: string
+          generated_at?: string
+          id?: never
+          lead_weeks?: number | null
+          share_asof?: string | null
+          source?: string
+          support_weeks?: number | null
+          trend_score?: number
+          value?: string
+        }
+        Relationships: []
+      }
+      trend_material_estimate: {
+        Row: {
+          adjustment_calibration_r: number | null
+          brand_id: string
+          category_id: string
+          colour_family: string
+          confidence: string
+          conformal_widening_units: number | null
+          consumption_norm_source: string
+          demand_p10: number
+          demand_p50: number
+          demand_p90: number
+          distance_threshold: number | null
+          fabric: string
+          fabric_p10: number
+          fabric_p50: number
+          fabric_p90: number
+          frozen_point_estimate: number | null
+          generated_at: string
+          held_values: Json
+          id: number
+          metres_per_garment: number | null
+          nearest_analogue_distance: number | null
+          nearest_analogues: Json
+          recommended_action: string
+          silhouette: string
+          trend_adjustment: number | null
+          trend_drivers: Json
+          trend_score: number | null
+          week: string
+        }
+        Insert: {
+          adjustment_calibration_r?: number | null
+          brand_id: string
+          category_id: string
+          colour_family: string
+          confidence: string
+          conformal_widening_units?: number | null
+          consumption_norm_source: string
+          demand_p10: number
+          demand_p50: number
+          demand_p90: number
+          distance_threshold?: number | null
+          fabric: string
+          fabric_p10: number
+          fabric_p50: number
+          fabric_p90: number
+          frozen_point_estimate?: number | null
+          generated_at?: string
+          held_values: Json
+          id?: never
+          metres_per_garment?: number | null
+          nearest_analogue_distance?: number | null
+          nearest_analogues?: Json
+          recommended_action: string
+          silhouette: string
+          trend_adjustment?: number | null
+          trend_drivers?: Json
+          trend_score?: number | null
+          week: string
+        }
+        Update: {
+          adjustment_calibration_r?: number | null
+          brand_id?: string
+          category_id?: string
+          colour_family?: string
+          confidence?: string
+          conformal_widening_units?: number | null
+          consumption_norm_source?: string
+          demand_p10?: number
+          demand_p50?: number
+          demand_p90?: number
+          distance_threshold?: number | null
+          fabric?: string
+          fabric_p10?: number
+          fabric_p50?: number
+          fabric_p90?: number
+          frozen_point_estimate?: number | null
+          generated_at?: string
+          held_values?: Json
+          id?: never
+          metres_per_garment?: number | null
+          nearest_analogue_distance?: number | null
+          nearest_analogues?: Json
+          recommended_action?: string
+          silhouette?: string
+          trend_adjustment?: number | null
+          trend_drivers?: Json
+          trend_score?: number | null
+          week?: string
+        }
+        Relationships: []
+      }
       value_summary: {
         Row: {
           basis: string
@@ -1584,7 +1731,7 @@ export type Database = {
         }[]
       }
       modules_for: {
-        Args: { p_segment: string; p_tier: string }
+        Args: { p_role?: string; p_segment: string; p_tier: string }
         Returns: {
           description: string
           duration_hours: number
@@ -1592,6 +1739,7 @@ export type Database = {
           module_id: string
           segment: string
           sequence: number
+          target_role: string | null
           tier: string
           title: string
           unlocks_capability: string

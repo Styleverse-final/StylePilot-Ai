@@ -59,6 +59,8 @@ const MODEL_OPS: NavItem = { href: "/model-ops", label: "Model ops" };
 const ADOPTION: NavItem = { href: "/adoption", label: "Adoption" };
 const DOWNSTREAM: NavItem = { href: "/downstream", label: "Downstream" };
 const PORTFOLIO: NavItem = { href: "/portfolio", label: "Portfolio" };
+/** Step 6 of the trend-to-material layer: precomputed hypotheticals. */
+const LAUNCH_LAB: NavItem = { href: "/launch-lab", label: "Launch lab" };
 
 export type NavConfig = {
   primary: readonly NavItem[];
@@ -89,14 +91,14 @@ const NAV_BY_ROLE: Readonly<Record<string, NavConfig>> = {
   planner: {
     primary: [DASHBOARD, EXCEPTIONS, BUY, ALLOCATION, WORKBENCH],
     secondary: [],
-    more: [MARKDOWN, SCENARIOS, LEARNING],
+    more: [MARKDOWN, SCENARIOS, LEARNING, LAUNCH_LAB],
   },
 
   /** As a planner, plus the ledger: they answer for their category. */
   category_manager: {
     primary: [DASHBOARD, EXCEPTIONS, BUY, ALLOCATION, WORKBENCH],
     secondary: [GOVERNANCE],
-    more: [MARKDOWN, SCENARIOS, LEARNING],
+    more: [MARKDOWN, SCENARIOS, LEARNING, LAUNCH_LAB],
   },
 
   /**
@@ -107,7 +109,7 @@ const NAV_BY_ROLE: Readonly<Record<string, NavConfig>> = {
   planning_manager: {
     primary: [DASHBOARD, GOVERNANCE, EXCEPTIONS, BUY, ALLOCATION],
     secondary: [WORKBENCH, ADOPTION],
-    more: [MARKDOWN, SCENARIOS, LEARNING],
+    more: [MARKDOWN, SCENARIOS, LEARNING, LAUNCH_LAB],
   },
 
   /**
@@ -119,7 +121,7 @@ const NAV_BY_ROLE: Readonly<Record<string, NavConfig>> = {
   commercial_lead: {
     primary: [DASHBOARD, GOVERNANCE, EXCEPTIONS, BUY, ALLOCATION],
     secondary: [WORKBENCH, ADOPTION],
-    more: [MARKDOWN, SCENARIOS, LEARNING],
+    more: [MARKDOWN, SCENARIOS, LEARNING, LAUNCH_LAB],
   },
 
   /**
