@@ -5,6 +5,8 @@ import { getSessionPlanner } from "@/lib/session";
 import { createServerAnonClient } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 
+import { LaunchLabForm } from "./LaunchLabForm";
+
 export const metadata: Metadata = {
   title: "Launch lab",
   description:
@@ -103,37 +105,6 @@ type ScoreRow = {
   source: string;
 };
 
-function Select({
-  name,
-  label,
-  options,
-  value,
-}: {
-  name: string;
-  label: string;
-  options: readonly string[];
-  value: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-[5px] block text-[10.5px] font-extrabold uppercase tracking-[0.05em] text-mute">
-        {label}
-      </span>
-      <select
-        name={name}
-        defaultValue={value}
-        className="h-[38px] w-full rounded-inner border border-rule2 bg-white px-[10px] text-[12.5px] font-semibold text-ink"
-      >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function Band({ p10, p50, p90, unit }: { p10: number; p50: number; p90: number; unit: string }) {
   const span = Math.max(p90 - p10, 1);
   const mid = ((p50 - p10) / span) * 100;
@@ -215,18 +186,20 @@ export default async function LaunchLabPage({
           subtitle={`${brandId === "SPD" ? "SpeedStyle" : "EcoWeave"} · four design axes vary; everything else is held at the category's historical norm and listed below the result`}
         />
         <CardBody>
-          <form method="get" className="grid grid-cols-5 items-end gap-[12px] max-[1140px]:grid-cols-2">
-            <Select name="category" label="Category" options={CATEGORIES} value={category} />
-            <Select name="fabric" label="Fabric" options={FABRICS} value={fabric} />
-            <Select name="silhouette" label="Silhouette" options={SILHOUETTES} value={silhouette} />
-            <Select name="colour" label="Colour family" options={COLOURS} value={colour} />
-            <button
-              type="submit"
-              className="h-[38px] rounded-pill bg-orange px-[18px] text-[12.5px] font-extrabold text-white transition-colors duration-[120ms] hover:bg-orangeD"
-            >
-              Estimate
-            </button>
-          </form>
+          <LaunchLabForm
+            /* Keyed on the params so a completed navigation remounts the
+               form with fresh state -- which is also what clears the
+               pending flag on the Estimate button. */
+            key={`${category}|${fabric}|${silhouette}|${colour}`}
+            categories={CATEGORIES}
+            fabrics={FABRICS}
+            silhouettes={SILHOUETTES}
+            colours={COLOURS}
+            category={category}
+            fabric={fabric}
+            silhouette={silhouette}
+            colour={colour}
+          />
         </CardBody>
       </Card>
 
